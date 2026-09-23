@@ -5,9 +5,6 @@ Astro on Cloudflare Workers, deployed to your own Cloudflare account by the Swel
 CLI. Merchants compose the home, product and category pages from sections in a
 visual editor the app itself serves at `/editor`.
 
-Marketing copy for the App Store listing lives in [DESCRIPTION.md](DESCRIPTION.md).
-This file is for people working on the code.
-
 ## What you need
 
 | | |
@@ -45,10 +42,9 @@ middleware refuses every request without those headers:
 { "error": "not_reachable_directly", "message": "This worker is served through Swell and needs the swell-* request headers." }
 ```
 
-That is deliberate — an unhandled throw there used to 500 every route, `/health`
-included. If you kill `swell app dev` with anything harsher than Ctrl-C, the
-tunnel registration is left behind on the store and the storefront keeps pointing
-at a dead tunnel; the next `swell app dev` re-registers and fixes it.
+If you stop `swell app dev` with anything harsher than Ctrl-C, the tunnel
+registration is left behind and the storefront keeps pointing at a tunnel that is
+gone. The next `swell app dev` re-registers it.
 
 ## Deploying
 
@@ -61,11 +57,10 @@ swell app frontend deploy # same deploy, and prints the storefront URL
 uploads what changed. Two things surprise people:
 
 - **A fresh clone has no app id.** `.swellrc` holds it and is gitignored, so the
-  first push on a new machine **creates a new app** on your store rather than
-  updating Swell's.
-- **A push deletes remote files that disappeared locally** — including ones you
-  gitignored after they were pushed. The deletes run after the uploads, so a
-  `--force` push in the same run does not undo it.
+  first push from a new clone creates a new app on your store rather than
+  updating an existing one.
+- **A push deletes remote files that no longer exist locally.** The deletes run
+  after the uploads, so a `--force` push in the same run does not undo it.
 
 ## Layout
 
