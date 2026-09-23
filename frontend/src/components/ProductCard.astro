@@ -1,0 +1,36 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import { formatMoney } from '@/lib/format';
+
+interface Props {
+  product: SwellData;
+}
+
+const { product } = Astro.props;
+const { currency, locale } = Astro.locals.swell.getStorefrontLocalization();
+
+const image = product.images?.[0]?.file?.url;
+// The second shot, cross-faded in on hover. Most products have one image, and
+// then the card is simply still.
+const hoverImage = image ? product.images?.[1]?.file?.url : undefined;
+
+const href = `/products/${product.slug || product.id}`;
+const onSale = Boolean(product.sale) && Number(product.orig_price) > 0;
+---
+
+<a class="card" href={href}>
+  <div class="card__media">
+    {image && <img src={image} alt={product.name} loading="lazy" />}
+    {hoverImage && <img src={hoverImage} alt="" aria-hidden="true" loading="lazy" />}
+  </div>
+
+  <div class="card__body">
+    <h3 class="card__name">{product.name}</h3>
+
+    <p class="card__price">
+      {onSale && <s>{formatMoney(product.orig_price, currency, locale)}</s>}
+      {formatMoney(product.price, currency, locale)}
+    </p>
+  </div>
+</a>

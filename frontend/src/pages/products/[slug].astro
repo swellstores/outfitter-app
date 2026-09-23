@@ -1,0 +1,42 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import Layout from '@/layouts/Layout.astro';
+import Sections from '@/components/sections/Sections.astro';
+import T from '@/components/T.astro';
+
+const { swell, t } = Astro.locals;
+const { slug } = Astro.params;
+
+const product: SwellData | null = slug
+  ? await swell.storefront.products
+      .get(slug, { expand: ['variants', 'up_sells.product'] })
+      .catch(() => null)
+  : null;
+
+if (!product) {
+  Astro.response.status = 404;
+}
+---
+
+<Layout
+  title={product?.name || t('product_not_found_page_title')}
+  description={product?.meta_description || product?.name}
+>
+  <div class="container">
+    {
+      product ? (
+        <Sections page="product" record={product} />
+      ) : (
+        <div class="empty empty--bare">
+          <p class="eyebrow"><T id="product_not_found_eyebrow" /></p>
+          <h1 class="display"><T id="product_not_found_title" /></h1>
+          <p class="lede"><T id="product_not_found_body" /></p>
+          <a class="btn" href="/">
+            <T id="product_not_found_back" />
+          </a>
+        </div>
+      )
+    }
+  </div>
+</Layout>

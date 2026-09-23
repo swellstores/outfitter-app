@@ -1,0 +1,53 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * Every category as a tile, each linking to its page. The names are store
+ * data, not section copy, so they are not edited here; a store with no
+ * categories shows only the heading.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { swell, editMode } = Astro.locals;
+
+const list = await swell.storefront.categories
+  .list({ limit: section.limit })
+  .catch(() => null);
+
+const categories: SwellData[] = list?.results ?? [];
+---
+
+<section class="sec sec--categories" data-section={section.id} data-section-type="categories">
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+  </div>
+
+  {
+    categories.length > 0 && (
+      <div class="grid sec__tiles">
+        {categories.map((category: SwellData) => {
+          const img = category.images?.[0]?.file?.url;
+          return (
+            <a class="card sec__tile" href={`/categories/${category.slug || category.id}`}>
+              <div class="sec__media sec__media--square">
+                {img && <img src={img} alt="" loading="lazy" />}
+              </div>
+              <div class="card__body">
+                <h3 class="card__name">{category.name}</h3>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    )
+  }
+</section>

@@ -1,0 +1,45 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * Up to four questions and their answers, all in view — no toggles, so the
+ * first click on an answer edits it. A question with neither title nor answer
+ * is left out of a shopper's page; in edit mode it stays, empty, so copy typed
+ * into the editor's rail shows up without a reload.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+
+const slots = [
+  { title: 'title_a', text: 'text_a' },
+  { title: 'title_b', text: 'text_b' },
+  { title: 'title_c', text: 'text_c' },
+  { title: 'title_d', text: 'text_d' },
+] as const;
+---
+
+<section class="sec sec--faq" data-section={section.id} data-section-type="faq">
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+    {(section.body || editMode) && (
+      <p class="lede"><T id={`sec:${section.id}:body`} value={section.body} /></p>
+    )}
+  </div>
+
+  <dl class="sec__faq">
+    {slots.map(({ title, text }) => (section[title] || section[text] || editMode) && (
+      <div class="sec__qa">
+        <dt class="sec__item-title"><T id={`sec:${section.id}:${title}`} value={section[title]} /></dt>
+        <dd class="sec__item-text"><T id={`sec:${section.id}:${text}`} value={section[text]} /></dd>
+      </div>
+    ))}
+  </dl>
+</section>

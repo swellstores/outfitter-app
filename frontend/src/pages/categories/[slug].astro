@@ -1,0 +1,40 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import Layout from '@/layouts/Layout.astro';
+import Sections from '@/components/sections/Sections.astro';
+import T from '@/components/T.astro';
+
+const { swell, t } = Astro.locals;
+const { slug } = Astro.params;
+
+const category: SwellData | null = slug
+  ? await swell.storefront.categories.get(slug).catch(() => null)
+  : null;
+
+if (!category) {
+  Astro.response.status = 404;
+}
+---
+
+<Layout
+  title={category?.name || t('category_not_found_page_title')}
+  description={category?.meta_description || category?.description}
+>
+  <div class="container">
+    {
+      category ? (
+        <Sections page="category" record={category} />
+      ) : (
+        <div class="empty empty--bare">
+          <p class="eyebrow"><T id="category_not_found_eyebrow" /></p>
+          <h1 class="display"><T id="category_not_found_title" /></h1>
+          <p class="lede"><T id="category_not_found_body" /></p>
+          <a class="btn" href="/">
+            <T id="category_not_found_back" />
+          </a>
+        </div>
+      )
+    }
+  </div>
+</Layout>

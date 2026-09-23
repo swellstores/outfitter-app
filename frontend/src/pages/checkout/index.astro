@@ -1,0 +1,153 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import Layout from '@/layouts/Layout.astro';
+import T from '@/components/T.astro';
+import { optionsOf } from '@/lib/cart-json';
+import { formatMoney } from '@/lib/format';
+
+const { swell, cart, t } = Astro.locals;
+const { currency, locale } = swell.getStorefrontLocalization();
+
+const items: SwellData[] = cart?.items ?? [];
+
+// Standard cart field. Rates from the store's own carriers and from any
+// shipping app arrive here together, once the shopper has an address, so this
+// page has no carrier-specific code in it at all.
+const services: SwellData[] = cart?.shipment_rating?.services ?? [];
+const selectedService = cart?.shipping?.service;
+
+const checkoutUrl =
+  typeof cart?.checkout_url === 'string' ? cart.checkout_url : '';
+---
+
+<Layout title={t('checkout_title')}>
+  <div class="container">
+    <header class="page-head">
+      <p class="eyebrow"><T id="checkout_eyebrow" /></p>
+      <h1 class="display"><T id="checkout_title" /></h1>
+    </header>
+
+    <div class="split">
+      <div>
+        <div class="section__head">
+          <h2 class="section__title"><T id="checkout_shipping_title" /></h2>
+        </div>
+
+        {
+          services.length > 0 ? (
+            <ul class="services">
+              {services.map((service: SwellData) => (
+                <li class="service">
+                  <div>
+                    <span class="service__name">{service.name}</span>
+                    {service.id === selectedService && (
+                      <span class="muted"> · <T id="checkout_selected" /></span>
+                    )}
+                    {service.description && (
+                      <p class="service__desc">{service.description}</p>
+                    )}
+                  </div>
+                  <span class="service__price">
+                    {formatMoney(service.price, currency, locale)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="lede">
+              <T id="checkout_no_services" />
+            </p>
+          )
+        }
+
+        <div class="section">
+          <div class="section__head">
+            <h2 class="section__title"><T id="checkout_order_title" /></h2>
+          </div>
+
+          <ul class="lines">
+            {
+              items.map((item: SwellData) => (
+                <li class="line">
+                  <div class="line__media">
+                    {item.product?.images?.[0]?.file?.url && (
+                      <img
+                        src={item.product.images[0].file.url}
+                        alt={item.product?.name}
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
+
+                  <div class="line__body">
+                    <h3 class="line__name">
+                      {item.product_name || item.product?.name}
+                    </h3>
+                    <p class="line__opts">
+                      {optionsOf(item) && `${optionsOf(item)} · `}
+                      <T id="checkout_quantity" /> {item.quantity}
+                    </p>
+                  </div>
+
+                  <div class="line__total">
+                    {formatMoney(item.price_total, currency, locale)}
+                  </div>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+
+      <aside class="summary">
+        <h2 class="section__title"><T id="checkout_summary_title" /></h2>
+
+        <div class="summary__row">
+          <span><T id="checkout_subtotal" /></span>
+          <span>{formatMoney(cart?.sub_total, currency, locale)}</span>
+        </div>
+
+        {
+          Number(cart?.shipment_total) > 0 && (
+            <div class="summary__row">
+              <span><T id="checkout_shipping" /></span>
+              <span>{formatMoney(cart?.shipment_total, currency, locale)}</span>
+            </div>
+          )
+        }
+
+        {
+          Number(cart?.tax_total) > 0 && (
+            <div class="summary__row">
+              <span><T id="checkout_tax" /></span>
+              <span>{formatMoney(cart?.tax_total, currency, locale)}</span>
+            </div>
+          )
+        }
+
+        <div class="summary__row summary__row--total">
+          <span><T id="checkout_total" /></span>
+          <span>{formatMoney(cart?.grand_total, currency, locale)}</span>
+        </div>
+
+        {
+          checkoutUrl ? (
+            <a class="btn btn--primary btn--block" href={checkoutUrl}>
+              <T id="checkout_continue" />
+            </a>
+          ) : (
+            <p class="summary__note">
+              <T id="checkout_unavailable" />{' '}
+              <a href="/cart"><T id="checkout_back_to_cart" /></a>.
+            </p>
+          )
+        }
+
+        <p class="summary__note">
+          <T id="checkout_payment_note" />
+        </p>
+      </aside>
+    </div>
+  </div>
+</Layout>

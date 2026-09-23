@@ -1,0 +1,75 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import T from '@/components/T.astro';
+
+const { swell, account, t } = Astro.locals;
+
+if (account) {
+  return Astro.redirect('/account', 303);
+}
+
+// The id of the error to show, so the sentence itself is editable copy.
+let error = '';
+let email = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+
+  email = String(form.get('email') ?? '');
+
+  const loggedIn = await swell.storefront.account
+    .login(email, String(form.get('password') ?? ''))
+    .catch(() => null);
+
+  if (loggedIn) {
+    return Astro.redirect('/account', 303);
+  }
+
+  error = 'account_login_error';
+}
+---
+
+<Layout title={t('account_login_title')}>
+  <div class="container">
+    <header class="page-head">
+      <p class="eyebrow"><T id="account_login_eyebrow" /></p>
+      <h1 class="display"><T id="account_login_title" /></h1>
+    </header>
+
+    <div class="narrow">
+      {error && <p class="error"><T id={error} /></p>}
+
+      <form method="post">
+        <label class="field">
+          <span class="field__label"><T id="account_login_email" /></span>
+          <input
+            class="input"
+            type="email"
+            name="email"
+            value={email}
+            autocomplete="email"
+            required
+          />
+        </label>
+
+        <label class="field">
+          <span class="field__label"><T id="account_login_password" /></span>
+          <input
+            class="input"
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+
+        <button class="btn btn--primary btn--block" type="submit"><T id="account_login_submit" /></button>
+      </form>
+
+      <p class="form-links">
+        <a href="/account/signup"><T id="account_login_signup_link" /></a>
+        <a href="/account/recover"><T id="account_login_recover_link" /></a>
+      </p>
+    </div>
+  </div>
+</Layout>

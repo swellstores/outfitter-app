@@ -1,0 +1,12 @@
+---
+/**
+ * The in-page copy editor. The layout renders this only in edit mode, so the
+ * script — and the styles it injects — are never part of a shopper's page.
+ */
+---
+
+<script>
+  import { startEditClient } from '@/lib/edit-client';
+
+  startEditClient();
+</script>

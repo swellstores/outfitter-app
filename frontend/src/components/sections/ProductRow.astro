@@ -1,0 +1,70 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import ProductCard from '@/components/ProductCard.astro';
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * A short row of products — the newest, or one category — with a link to
+ * see all. The light sibling of the products section: no category nav and
+ * no counts. The link is left out of a shopper's page when it has no label;
+ * in edit mode it stays, empty, so copy typed into the editor's rail shows
+ * up without a reload.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { swell, editMode } = Astro.locals;
+
+const category = section.category;
+const limit = section.limit;
+
+let list = await swell.storefront.products
+  .list(category ? { category, limit } : { limit })
+  .catch(() => null);
+
+// The category is typed by hand — there is no lookup field — so a slug that
+// matches nothing is likely enough to be worth falling back to the newest
+// products instead of showing an empty row.
+const showingCategory = Boolean(category && list?.results?.length);
+
+if (category && !showingCategory) {
+  list = await swell.storefront.products.list({ limit }).catch(() => null);
+}
+
+const products: SwellData[] = list?.results ?? [];
+
+// The button's own link, else the category the row is showing, else the shop.
+const href = section.cta_url || (showingCategory ? `/categories/${category}` : '/');
+---
+
+<section class="sec sec--product-row" data-section={section.id} data-section-type="product_row">
+  <div class="section__head">
+    <h2 class="section__title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+    {(section.cta_label || editMode) && (
+      <a class="sec__link" href={href}>
+        <T id={`sec:${section.id}:cta_label`} value={section.cta_label} />
+      </a>
+    )}
+  </div>
+
+  {
+    products.length > 0 ? (
+      <div class="grid">
+        {products.map((product: SwellData) => (
+          <ProductCard product={product} />
+        ))}
+      </div>
+    ) : (
+      <div class="empty empty--bare">
+        <h3 class="subtitle"><T id="home_empty_title" /></h3>
+        <p class="lede">
+          <T id="home_empty_body" />
+        </p>
+      </div>
+    )
+  }
+</section>

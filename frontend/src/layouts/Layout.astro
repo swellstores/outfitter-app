@@ -1,0 +1,2677 @@
+---
+import { tenantKey } from '@/swell';
+import { getAppSettings } from '@/lib/app-settings';
+import { isLightColor, safeColor } from '@/lib/color';
+import { localizationOptions } from '@/lib/localization';
+import EditClient from '@/components/EditClient.astro';
+import T from '@/components/T.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Full-bleed pages opt out of the default page top padding. */
+  flush?: boolean;
+}
+
+const FAVICON =
+  'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2032%2032%22%3E%3Crect%20width=%2232%22%20height=%2232%22%20rx=%227%22%20fill=%22%23111111%22%20/%3E%3Cpath%0A%20%20%20%20d=%22M11%2011h10M11%2016h10M11%2021h6%22%0A%20%20%20%20stroke=%22%23ffffff%22%0A%20%20%20%20stroke-width=%222.5%22%0A%20%20%20%20stroke-linecap=%22round%22%0A%20%20/%3E%3C/svg%3E';
+
+const { title, description, flush } = Astro.props;
+const { swell, settings, t, editMode, editLocale } = Astro.locals;
+
+const app = await getAppSettings(swell, tenantKey(Astro));
+
+// Pages are cached and shared between visitors, so nothing per-visitor is
+// rendered here. The cart count and drawer hydrate client-side from /cart.json;
+// the client only needs to know how to format money.
+const { currency, locale } = swell.getStorefrontLocalization();
+
+// Settings → General names the store; the app setting overrides it for
+// merchants whose shopfront goes by something else.
+const storeNameOverride =
+  typeof app.store_name === 'string' ? app.store_name.trim() : '';
+const storeName: string =
+  storeNameOverride || settings?.state?.store?.name || 'Outfitter';
+const logo = typeof app.logo === 'string' ? app.logo : app.logo?.url;
+
+// The language and currency control, only when there is a choice to make.
+// It posts to /localization and comes back here: the query string comes too,
+// so an editing render (`__edit`) stays one after the switch.
+const store = settings?.state?.store;
+const locales = localizationOptions(store?.locale, store?.locales);
+const currencies = localizationOptions(store?.currency, store?.currencies);
+const localization = locales.length > 1 || currencies.length > 1;
+const here = `${Astro.url.pathname}${Astro.url.search}`;
+
+// support_email is not ours to ask for — Swell already collects one in the
+// store's own settings, so the footer sources it there or shows nothing.
+const supportEmail =
+  typeof settings?.state?.store?.support_email === 'string'
+    ? settings.state.store.support_email.trim()
+    : '';
+
+const pageTitle = title ? `${title} — ${storeName}` : storeName;
+
+// Every token has a default in the :root block below, so the palette is only
+// overridden for the values the merchant actually set and that parse cleanly.
+const tokens = styleFor({
+  '--color-primary': app.color_primary,
+  '--color-secondary': app.color_secondary,
+  '--color-text': app.color_text,
+  '--color-muted': app.color_muted,
+  '--color-background': app.color_background,
+  '--color-surface': app.color_surface,
+  '--color-border': app.color_border,
+});
+
+// Scrollbars, select menus and autofill are the browser's to draw, and it
+// draws them dark until the page says otherwise. A merchant who sets a light
+// background gets light ones; anything we cannot read keeps the dark default.
+const scheme = isLightColor(app.color_background);
+
+// The chevron is a background image, which is isolated from the page and so
+// cannot read a custom property or `currentColor`. Painting it here is the
+// only way it follows the merchant's muted colour instead of the default's.
+const chevron = selectChevron(app.color_muted);
+
+const palette =
+  [tokens, scheme === true ? 'color-scheme:light' : undefined, chevron]
+    .filter(Boolean)
+    .join(';') || undefined;
+
+/**
+ * The select chevron, drawn in `color`. Every character that would need
+ * quoting inside `url()` is percent-encoded, so the declaration carries no
+ * quotes, parentheses or spaces of its own and survives the style attribute.
+ */
+function selectChevron(value: unknown): string | undefined {
+  const color = safeColor(value);
+
+  if (!color) {
+    return undefined;
+  }
+
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 6">` +
+    `<path d="M1 1l4 4 4-4" fill="none" stroke="${color}" stroke-width="1.2"/>` +
+    `</svg>`;
+
+  return `--select-chevron:url(data:image/svg+xml,${encodeURIComponent(svg)})`;
+}
+
+// Only literal colors reach the style attribute below; see lib/color.ts.
+function styleFor(tokens: Record<string, unknown>): string | undefined {
+  const declarations = Object.entries(tokens)
+    .map(([name, value]) => [name, safeColor(value)])
+    .filter(([, value]) => value)
+    .map(([name, value]) => `${name}:${value}`);
+
+  return declarations.length > 0 ? declarations.join(';') : undefined;
+}
+---
+
+<html
+  lang="en"
+  style={palette}
+  data-currency={currency}
+  data-locale={locale}
+  data-edit-locale={editMode ? editLocale : undefined}
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    {/* Inline: a request for /favicon.svg would cross the proxy like any page. */}
+    <link rel="icon" type="image/svg+xml" href={FAVICON} />
+    <title>{pageTitle}</title>
+    {description && <meta name="description" content={description} />}
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    {/* media="print" keeps the font off the render path; the script below
+        promotes it once it has loaded. The fallback stack is a real one, so
+        nothing on the page ever waits for the network. */}
+    <link
+      id="webfont"
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      media="print"
+    />
+    <script is:inline>
+      (function () {
+        var el = document.getElementById('webfont');
+        if (!el) return;
+        if (el.sheet) {
+          el.media = 'all';
+          return;
+        }
+        el.addEventListener('load', function () {
+          el.media = 'all';
+        });
+      })();
+    </script>
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      />
+    </noscript>
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main"><T id="global_skip_link" /></a>
+
+    <header class="site-header">
+      <div class="container site-header__inner">
+        <nav class="nav nav--start" aria-label={t('global_nav_main_label')}>
+          <a class="nav__link" href="/"><T id="global_nav_shop" /></a>
+        </nav>
+
+        <a class="brand" href="/">
+          {
+            logo ? (
+              <img class="brand__logo" src={logo} alt={storeName} />
+            ) : (
+              <span class="brand__name">{storeName}</span>
+            )
+          }
+        </a>
+
+        <div class="site-header__end">
+          <nav class="nav nav--end" aria-label={t('global_nav_secondary_label')}>
+            <a class="nav__link nav__link--account" href="/account"><T id="global_nav_account" /></a>
+            <a class="nav__link" href="/cart" data-cart-open>
+              <T id="global_nav_cart" /> <span class="nav__count" data-cart-count>(0)</span>
+            </a>
+          </nav>
+
+          {
+            /* data-edit-allow: in the editor this form submits on first
+               change; switching language to edit it is not shopping. */
+            localization && (
+              <form
+                class="loc"
+                method="post"
+                action="/localization"
+                data-localization
+                data-edit-allow
+              >
+                <input type="hidden" name="redirect_to" value={here} />
+                {locales.length > 1 && (
+                  <select
+                    class="input"
+                    name="locale"
+                    aria-label={t('global_localization_language')}
+                  >
+                    {locales.map((option) => (
+                      <option value={option.code} selected={option.code === locale}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {currencies.length > 1 && (
+                  <select
+                    class="input"
+                    name="currency"
+                    aria-label={t('global_localization_currency')}
+                  >
+                    {currencies.map((option) => (
+                      <option value={option.code} selected={option.code === currency}>
+                        {option.code}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button class="btn btn--small" type="submit" data-localization-apply>
+                  <T id="global_localization_apply" />
+                </button>
+              </form>
+            )
+          }
+        </div>
+      </div>
+    </header>
+
+    <main class="site-main" id="main" data-flush={flush ? '' : undefined}>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container site-footer__inner">
+        <p class="site-footer__mark">{storeName}</p>
+
+        <nav class="site-footer__links" aria-label={t('global_footer_label')}>
+          <a href="/"><T id="global_footer_shop" /></a>
+          <a href="/account"><T id="global_footer_account" /></a>
+          <a href="/cart"><T id="global_footer_cart" /></a>
+          {supportEmail && <a href={`mailto:${supportEmail}`}><T id="global_footer_support" /></a>}
+        </nav>
+
+        {app.demo_mode === true && (
+          <p class="site-footer__demo"><T id="demo_footer_notice" /></p>
+        )}
+
+        <p class="site-footer__legal">&copy; {new Date().getFullYear()}</p>
+      </div>
+    </footer>
+
+    {/* Cart drawer. Opens optimistically on add-to-cart, before the request
+        completes, then reconciles with the real cart. Without JS the forms
+        it intercepts still post to /cart and land on the cart page. The
+        data-t-* attributes carry the copy the script renders itself, so it
+        comes from the same content panel as everything else. */}
+    <div
+      class="drawer"
+      id="cart-drawer"
+      hidden
+      aria-hidden="true"
+      data-t-adding={t('global_drawer_adding')}
+      data-t-updating={t('global_drawer_updating')}
+      data-t-removing={t('global_drawer_removing')}
+      data-t-remove={t('global_drawer_remove')}
+      data-t-qty={t('global_drawer_qty')}
+      data-t-decrease={t('global_drawer_decrease')}
+      data-t-increase={t('global_drawer_increase')}
+      data-t-error={t('global_drawer_error')}
+    >
+      <div class="drawer__backdrop" data-drawer-close></div>
+      <aside
+        class="drawer__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="drawer-title"
+        data-drawer-panel
+      >
+        <header class="drawer__head">
+          <h2 class="section__title" id="drawer-title">
+            <T id="global_drawer_title" /> <span data-cart-count>(0)</span>
+          </h2>
+          <button
+            class="drawer__close"
+            type="button"
+            data-drawer-close
+            aria-label={t('global_drawer_close')}
+          >
+            &times;
+          </button>
+        </header>
+
+        <p class="drawer__status meta" data-drawer-status aria-live="polite"></p>
+
+        <ul class="drawer__lines" data-drawer-lines></ul>
+
+        <div class="drawer__empty" data-drawer-empty hidden>
+          <p class="lede"><T id="global_drawer_empty" /></p>
+          <a class="btn" href="/" data-drawer-close><T id="global_drawer_browse" /></a>
+        </div>
+
+        <footer class="drawer__foot" data-drawer-foot hidden>
+          <div class="summary__row summary__row--total">
+            <span><T id="global_drawer_subtotal" /></span>
+            <span data-drawer-subtotal>—</span>
+          </div>
+          <a class="btn btn--primary btn--block" href="/checkout" data-drawer-checkout>
+            <T id="global_drawer_checkout" />
+          </a>
+          <a class="drawer__link" href="/cart"><T id="global_drawer_view_cart" /></a>
+        </footer>
+      </aside>
+    </div>
+
+    {
+      /* The in-page copy editor: only on edit-mode renders, so a shopper's
+         page carries none of it. It also holds every form here back until a
+         second click on its button, which is what keeps the drawer from
+         opening on a first click on an add-to-cart label while editing. */
+      editMode && <EditClient />
+    }
+
+    <script>
+      // The language and currency control applies on change. The Apply
+      // button is the no-script path and goes away once this runs.
+      const localization = document.querySelector<HTMLFormElement>('form[data-localization]');
+
+      if (localization) {
+        localization.querySelector<HTMLElement>('[data-localization-apply]')!.hidden = true;
+        localization.addEventListener('change', () => localization.requestSubmit());
+      }
+    </script>
+
+    <script>
+      // Cart drawer and header count. Pages are cached and shared, so all
+      // per-visitor state is fetched from /cart.json after load and every
+      // change goes through POST /cart with an Accept: application/json.
+
+      type Line = {
+        id: string;
+        name: string;
+        slug: string | null;
+        image: string | null;
+        options: string;
+        price: number;
+        price_total: number;
+        quantity: number;
+        pending?: boolean;
+      };
+
+      type Cart = {
+        item_quantity: number;
+        sub_total: number;
+        grand_total: number;
+        currency: string | null;
+        checkout_url: string | null;
+        items: Line[];
+      };
+
+      const drawer = document.getElementById('cart-drawer');
+
+      if (drawer) {
+        setUp(drawer);
+      }
+
+      function setUp(drawer: HTMLElement) {
+        const root = document.documentElement;
+        const locale = root.dataset.locale || 'en-US';
+        const fallbackCurrency = root.dataset.currency || 'USD';
+
+        const panel = drawer.querySelector<HTMLElement>('[data-drawer-panel]')!;
+        const lines = drawer.querySelector<HTMLElement>('[data-drawer-lines]')!;
+        const empty = drawer.querySelector<HTMLElement>('[data-drawer-empty]')!;
+        const foot = drawer.querySelector<HTMLElement>('[data-drawer-foot]')!;
+        const status = drawer.querySelector<HTMLElement>('[data-drawer-status]')!;
+        const subtotal = drawer.querySelector<HTMLElement>('[data-drawer-subtotal]')!;
+        const checkout = drawer.querySelector<HTMLAnchorElement>('[data-drawer-checkout]')!;
+        const counts = document.querySelectorAll<HTMLElement>('[data-cart-count]');
+
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        // The store's copy, rendered into data-t-* on the drawer by the layout.
+        const copy = {
+          adding: drawer.dataset.tAdding ?? '',
+          updating: drawer.dataset.tUpdating ?? '',
+          removing: drawer.dataset.tRemoving ?? '',
+          remove: drawer.dataset.tRemove ?? '',
+          qty: drawer.dataset.tQty ?? '',
+          decrease: drawer.dataset.tDecrease ?? '',
+          increase: drawer.dataset.tIncrease ?? '',
+          error: drawer.dataset.tError ?? '',
+        };
+
+        let cart: Cart | null = null;
+        let lastFocus: Element | null = null;
+        let closeTimer = 0;
+
+        // ---- rendering ------------------------------------------------
+
+        function money(amount: number, currency: string | null): string {
+          const code = currency || fallbackCurrency;
+          try {
+            return new Intl.NumberFormat(locale, {
+              style: 'currency',
+              currency: code,
+            }).format(amount);
+          } catch {
+            return `${code} ${amount.toFixed(2)}`;
+          }
+        }
+
+        function setCount(quantity: number) {
+          counts.forEach((el) => {
+            el.textContent = `(${quantity})`;
+          });
+        }
+
+        function el<K extends keyof HTMLElementTagNameMap>(
+          tag: K,
+          className?: string,
+          text?: string,
+        ): HTMLElementTagNameMap[K] {
+          const node = document.createElement(tag);
+          if (className) node.className = className;
+          if (text !== undefined) node.textContent = text;
+          return node;
+        }
+
+        function render(next: Cart, message = '') {
+          status.textContent = message;
+          setCount(next.item_quantity);
+
+          lines.replaceChildren(...next.items.map(renderLine.bind(null, next)));
+
+          const hasItems = next.items.length > 0;
+          empty.hidden = hasItems;
+          foot.hidden = !hasItems;
+          subtotal.textContent = money(next.sub_total, next.currency);
+          checkout.href = '/checkout';
+        }
+
+        function renderLine(next: Cart, line: Line): HTMLElement {
+          const item = el('li', 'drawer__line' + (line.pending ? ' is-pending' : ''));
+
+          // Eager, not lazy: the drawer holds a handful of thumbnails and they
+          // are all in view the moment it opens.
+          const media = el('div', 'line__media');
+          if (line.image) {
+            const img = el('img');
+            img.src = line.image;
+            img.alt = '';
+            media.append(img);
+          }
+
+          const body = el('div', 'drawer__body');
+          const name = el('a', 'drawer__name', line.name);
+          name.href = line.slug ? `/products/${line.slug}` : '/cart';
+          body.append(name);
+
+          if (line.options) {
+            body.append(el('p', 'line__opts', line.options));
+          }
+
+          const controls = el('div', 'drawer__controls');
+
+          if (line.pending) {
+            controls.append(el('span', 'line__opts', `${copy.qty} ${line.quantity}`));
+          } else {
+            const qty = el('div', 'drawer__qty');
+            const minus = el('button', 'drawer__step', '−');
+            minus.type = 'button';
+            minus.setAttribute('aria-label', copy.decrease);
+            const value = el('span', 'drawer__value', String(line.quantity));
+            const plus = el('button', 'drawer__step', '+');
+            plus.type = 'button';
+            plus.setAttribute('aria-label', copy.increase);
+
+            minus.addEventListener('click', () => change(line, line.quantity - 1));
+            plus.addEventListener('click', () => change(line, line.quantity + 1));
+            qty.append(minus, value, plus);
+
+            const remove = el('button', 'linkbtn', copy.remove);
+            remove.type = 'button';
+            remove.addEventListener('click', () => change(line, 0));
+
+            controls.append(qty, remove);
+          }
+
+          body.append(controls);
+
+          const total = el('div', 'line__total', money(line.price_total, next.currency));
+
+          item.append(media, body, total);
+          return item;
+        }
+
+        // ---- data ---------------------------------------------------------
+
+        async function load(): Promise<Cart | null> {
+          try {
+            const res = await fetch('/cart.json', { credentials: 'same-origin' });
+            const data = await res.json();
+            cart = data.cart;
+            if (cart) render(cart);
+            return cart;
+          } catch {
+            return null;
+          }
+        }
+
+        // Writes run one at a time. Two quick stepper clicks would otherwise
+        // race, and whichever response landed last would win the render.
+        let queue: Promise<unknown> = Promise.resolve();
+
+        function post(form: FormData): Promise<Cart> {
+          const run = queue.then(() => send(form));
+          queue = run.catch(() => undefined);
+          return run;
+        }
+
+        async function send(form: FormData): Promise<Cart> {
+          const res = await fetch('/cart', {
+            method: 'POST',
+            body: form,
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+          });
+
+          const data = await res.json().catch(() => ({}));
+
+          if (!res.ok || data.error) {
+            throw new Error(data.error || copy.error);
+          }
+
+          cart = data.cart;
+          return data.cart;
+        }
+
+        // Quantity changes from inside the drawer are optimistic too: the
+        // line updates instantly, then settles on whatever the server says.
+        async function change(line: Line, quantity: number) {
+          if (!cart) return;
+
+          const before = cart;
+          const items = cart.items
+            .map((item) =>
+              item.id === line.id
+                ? {
+                    ...item,
+                    quantity,
+                    price_total: item.price * quantity,
+                    pending: true,
+                  }
+                : item,
+            )
+            .filter((item) => item.quantity > 0);
+
+          render(recalc({ ...cart, items }), quantity > 0 ? copy.updating : copy.removing);
+
+          const form = new FormData();
+          form.set('action', quantity > 0 ? 'update' : 'remove');
+          form.set('item_id', line.id);
+          form.set('quantity', String(quantity));
+
+          try {
+            render(await post(form));
+          } catch (err) {
+            cart = before;
+            render(before, (err as Error).message);
+          }
+        }
+
+        function recalc(next: Cart): Cart {
+          const sub_total = next.items.reduce((sum, item) => sum + item.price_total, 0);
+          const item_quantity = next.items.reduce((sum, item) => sum + item.quantity, 0);
+          return { ...next, sub_total, item_quantity };
+        }
+
+        function emptyCart(): Cart {
+          return {
+            item_quantity: 0,
+            sub_total: 0,
+            grand_total: 0,
+            currency: fallbackCurrency,
+            checkout_url: null,
+            items: [],
+          };
+        }
+
+        // ---- add to cart, optimistically ----------------------------------
+
+        document.addEventListener('submit', (event) => {
+          const form = event.target as HTMLFormElement;
+          if (!form.matches('form[data-cart-form]')) return;
+
+          event.preventDefault();
+
+          const data = new FormData(form);
+          const quantity = Math.max(1, Math.floor(Number(data.get('quantity')) || 1));
+
+          // What the shopper answered, read off the controls themselves so the
+          // drawer can name it and price it before the server replies. Every
+          // option's price is a delta on the product's own; the API adds the
+          // same amounts, so the pending line matches the one that replaces it.
+          const chosen: string[] = [];
+          let price = Number(form.dataset.price) || 0;
+
+          form
+            .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+              '[name^="options["]',
+            )
+            .forEach((control) => {
+              const field = control.closest<HTMLElement>('[data-option]');
+              if (field?.hidden) return;
+
+              const picked =
+                control instanceof HTMLSelectElement ? control.selectedOptions[0] : control;
+
+              if (control instanceof HTMLInputElement && control.type === 'checkbox') {
+                if (!control.checked) return;
+              } else if (!control.value.trim()) {
+                return;
+              }
+
+              const label =
+                picked instanceof HTMLOptionElement
+                  ? picked.dataset.label || picked.textContent?.trim() || ''
+                  : control.dataset.label || control.value.trim();
+
+              // Same rule as optionsOf in lib/cart-json.ts: a variant
+              // option is its value alone, anything else is named. Matching
+              // it is what stops the line rewriting itself on the reply.
+              const name = field?.querySelector('.field__label span')?.textContent?.trim();
+              const named = name && !field?.hasAttribute('data-option-variant');
+              chosen.push(named ? `${name}: ${label}` : label);
+              price += Number(picked.dataset.price) || 0;
+            });
+
+          const optimistic: Line = {
+            id: `pending-${Date.now()}`,
+            name: form.dataset.name || '',
+            slug: form.dataset.slug || null,
+            image: form.dataset.image || null,
+            options: chosen.join(' · '),
+            price,
+            price_total: price * quantity,
+            quantity,
+            pending: true,
+          };
+
+          const before = cart ?? emptyCart();
+          render(
+            recalc({ ...before, items: [optimistic, ...before.items] }),
+            copy.adding,
+          );
+          open();
+
+          post(data).then(
+            (next) => render(next),
+            (err) => {
+              cart = before;
+              render(before, (err as Error).message);
+            },
+          );
+        });
+
+        // ---- open / close -------------------------------------------------
+
+        function open() {
+          window.clearTimeout(closeTimer);
+          lastFocus = document.activeElement;
+          drawer.hidden = false;
+          drawer.setAttribute('aria-hidden', 'false');
+          document.body.classList.add('drawer-open');
+          // Force a layout between un-hiding and opening so the slide-in has a
+          // starting state. A reflow is synchronous; requestAnimationFrame is
+          // not, and never fires at all in a background tab.
+          void drawer.offsetWidth;
+          drawer.classList.add('is-open');
+          // The close *button* — the backdrop carries the same data attribute
+          // but a div cannot take focus.
+          drawer.querySelector<HTMLElement>('.drawer__close')?.focus();
+        }
+
+        function close() {
+          drawer.classList.remove('is-open');
+          drawer.setAttribute('aria-hidden', 'true');
+          document.body.classList.remove('drawer-open');
+
+          const finish = () => {
+            drawer.hidden = true;
+          };
+          closeTimer = window.setTimeout(finish, reduced.matches ? 0 : 260);
+
+          if (lastFocus instanceof HTMLElement) lastFocus.focus();
+        }
+
+        drawer.addEventListener('click', (event) => {
+          if ((event.target as HTMLElement).closest('[data-drawer-close]')) {
+            close();
+          }
+        });
+
+        document.addEventListener('keydown', (event) => {
+          if (drawer.hidden) return;
+
+          if (event.key === 'Escape') {
+            close();
+            return;
+          }
+
+          // Keep Tab inside the dialog while it is open.
+          if (event.key === 'Tab') {
+            const focusable = panel.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), input, select, [tabindex]:not([tabindex="-1"])',
+            );
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first.focus();
+            }
+          }
+        });
+
+        document.querySelectorAll<HTMLAnchorElement>('[data-cart-open]').forEach((link) => {
+          link.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (!cart) load();
+            open();
+          });
+        });
+
+        load();
+      }
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  /* Every rule for the shop lives here. Components use these classes rather
+     than carrying their own styles. */
+
+  :root {
+    /* Merchant palette, dark by default. The inline style on <html> overrides
+       only what the merchant set, so an unconfigured store still looks
+       designed. Defaults mirror settings/outfitter.json — change both. */
+    --color-primary: #f0f0f0;
+    --color-secondary: #0f0f0f;
+    --color-text: #f0f0f0;
+    --color-muted: #9e9e9e;
+    --color-background: #0f0f0f;
+    --color-surface: #181818;
+    --color-border: #3f3f3f;
+
+    /* Native controls, scrollbars and the select chevron follow the palette. */
+    color-scheme: dark;
+
+    --font-sans:
+      'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
+      Arial, sans-serif;
+    --font-mono:
+      'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* Sizes are small and tracking is positive on everything below 1rem —
+       that ratio is what reads as considered rather than templated. */
+    --text-chrome: 0.6875rem;
+    --text-nav: 0.8125rem;
+    --text-meta: 0.75rem;
+    --text-body: 0.875rem;
+    --text-lede: 1rem;
+    --text-h2: 1.75rem;
+    --text-h1: 2rem;
+    --text-display: clamp(2.25rem, 5vw, 3.5rem);
+
+    --track-chrome: 0.14em;
+    --track-wide: 0.05em;
+
+    --container: 1400px;
+    --pad: 1.5rem;
+    --gutter: 1.5rem;
+    --row-gap: 2.5rem;
+    --section: 5rem;
+    --header-h: 64px;
+    --prose: 34rem;
+
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --dur-ui: 150ms;
+    --dur-media: 400ms;
+  }
+
+  @media (max-width: 767px) {
+    :root {
+      --section: 3rem;
+      --row-gap: 2rem;
+      --gutter: 1rem;
+    }
+  }
+
+  @media (max-width: 479px) {
+    :root {
+      --pad: 1.25rem;
+    }
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    /* Full-bleed sections are laid out against 100vw, which includes the
+       scrollbar gutter; clip rather than scroll. `clip` (not `hidden`) does
+       not make the viewport a scroll container, so the sticky header holds. */
+    overflow-x: clip;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    letter-spacing: var(--track-wide);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  /* An author `display` on a class would otherwise beat the attribute — the
+     drawer toggles its empty state and footer with `hidden`. */
+  [hidden] {
+    display: none !important;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Links underline rather than change color — the palette stays monochrome
+     and the product supplies the color. */
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+    text-decoration-thickness: 1px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    margin: 0;
+    font-weight: 500;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-secondary);
+  }
+
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    padding: 0.75rem 1rem;
+    background: var(--color-primary);
+    color: var(--color-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+  }
+
+  .skip-link:focus {
+    left: 0;
+  }
+
+  .container {
+    width: 100%;
+    max-width: var(--container);
+    margin: 0 auto;
+    padding: 0 var(--pad);
+  }
+
+  /* Header ------------------------------------------------------------ */
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--color-background);
+  }
+
+  .site-header__inner {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+    min-height: var(--header-h);
+  }
+
+  .brand {
+    justify-self: center;
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+  }
+
+  .brand:hover {
+    text-decoration: none;
+  }
+
+  .brand__name {
+    font-family: var(--font-mono);
+    font-size: var(--text-nav);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .brand__logo {
+    max-height: 28px;
+    width: auto;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .nav--end {
+    justify-content: flex-end;
+  }
+
+  .nav__link,
+  .site-footer__links a {
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* The header runs a size up from the rest of the chrome, and each link is a
+     full-height tap target rather than an 18px line of text. */
+  .nav__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: var(--text-nav);
+  }
+
+  .nav__count {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .site-header__end {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1.5rem;
+  }
+
+  /* Language and currency: header chrome, not a form field, so the controls
+     take the nav's size and face. Beats `select.input` on specificity. */
+  .loc {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .loc .input {
+    width: auto;
+    max-width: 11rem;
+    min-height: 36px;
+    padding: 0 1.5rem 0 0.625rem;
+    background-position: right 0.5rem center;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+  }
+
+  /* Below this the end column cannot hold the links and the language and
+     currency control side by side, so the control gets a row of its own
+     beneath them — full width, so a long store name is not squeezed to make
+     room for it. Only the first row is declared: without the control there
+     is no second row, and no gap. */
+  @media (max-width: 899px) {
+    .site-header__inner {
+      grid-template-rows: var(--header-h);
+    }
+
+    .site-header__end {
+      display: contents;
+    }
+
+    .loc {
+      grid-column: 1 / -1;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding-bottom: 0.625rem;
+    }
+  }
+
+  @media (max-width: 599px) {
+    .site-header__inner {
+      grid-template-columns: auto 1fr;
+      gap: 0.75rem;
+    }
+
+    /* 1rem: anything smaller makes iOS zoom on focus. */
+    .loc .input {
+      font-size: 1rem;
+    }
+
+    /* The centred wordmark cannot hold at this width, so it moves left and
+       the shop link folds into it. */
+    .nav--start {
+      display: none;
+    }
+
+    .brand {
+      justify-self: start;
+      order: -1;
+      min-width: 0;
+    }
+
+    .nav {
+      gap: 1rem;
+    }
+  }
+
+  /* Main, footer ------------------------------------------------------ */
+
+  .site-main {
+    flex: 1;
+    padding-bottom: 7.5rem;
+  }
+
+  .site-main:not([data-flush]) {
+    padding-top: 3rem;
+  }
+
+  @media (max-width: 767px) {
+    .site-main {
+      padding-bottom: 4rem;
+    }
+
+    .site-main:not([data-flush]) {
+      padding-top: 2rem;
+    }
+  }
+
+  .site-footer {
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+  }
+
+  .site-footer__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+
+  .site-footer__mark,
+  /* Said plainly rather than quietly: the point is that nobody mistakes the
+     store for one that ships. Full width, so it never reads as a footer link. */
+  .site-footer__demo {
+    flex-basis: 100%;
+    order: -1;
+    padding-bottom: 1rem;
+    color: var(--color-text);
+  }
+
+  .site-footer__legal {
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+  }
+
+  .site-footer__mark {
+    color: var(--color-text);
+  }
+
+  .site-footer__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+
+  /* Type -------------------------------------------------------------- */
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .display {
+    font-size: var(--text-display);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  .title {
+    font-size: var(--text-h1);
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  .subtitle {
+    font-size: var(--text-h2);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+
+  .lede {
+    max-width: 42ch;
+    font-size: var(--text-lede);
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+    color: var(--color-muted);
+  }
+
+  .meta {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+    color: var(--color-muted);
+  }
+
+  .muted {
+    color: var(--color-muted);
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .prose {
+    max-width: var(--prose);
+    color: var(--color-muted);
+  }
+
+  .prose > * + * {
+    margin-top: 1rem;
+  }
+
+  .prose img {
+    margin: 1.5rem 0;
+  }
+
+  .prose a {
+    color: var(--color-text);
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+
+  /* Page and section headings ----------------------------------------- */
+
+  .page-head {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 3.5rem;
+  }
+
+  .section {
+    margin-top: calc(var(--section) * var(--sec-pad-k, 1));
+    border-bottom: var(--sec-rule, 0) solid var(--color-border);
+  }
+
+  .section__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    text-align: var(--sec-align, left);
+    justify-content: var(--sec-justify, space-between);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .section__title {
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+  }
+
+  /* Home hero --------------------------------------------------------- */
+
+  .hero {
+    padding: calc(4rem * var(--sec-pad-k, 1)) 0 calc(6rem * var(--sec-pad-k, 1));
+    border-bottom: var(--sec-rule, 1px) solid var(--color-border);
+    /* A hero may carry a background picture, under the scrim its overlay
+       setting asks for; with neither set both layers are `none`. */
+    background-image: var(--sec-scrim-img, none), var(--sec-image, none);
+    background-size: cover;
+    background-position: center;
+  }
+
+  .hero__lead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    align-items: var(--sec-items, flex-start);
+  }
+
+  /* The hero's measure lives here, not on `.sec__lead` — which it does not
+     render — so its Width setting has something to widen. */
+  .hero .lede {
+    max-width: var(--sec-measure, 42ch);
+  }
+
+  @media (max-width: 767px) {
+    .hero {
+      padding: calc(1.5rem * var(--sec-pad-k, 1)) 0 calc(3rem * var(--sec-pad-k, 1));
+    }
+  }
+
+  /* Home sections ----------------------------------------------------- */
+
+  /* Each is a band with a hairline beneath, the rhythm the hero sets. The
+     last one gives its line up to the footer's. */
+  .sec {
+    padding: calc(var(--section) * var(--sec-pad-k, 1)) 0;
+    border-bottom: var(--sec-rule, 1px) solid var(--color-border);
+  }
+
+  .container > .sec:last-child {
+    border-bottom: 0;
+  }
+
+  /* `.section` (products) is deliberately excluded — only its head moves.
+     `.sec--product-row` too: its "Heading alignment" is its head's. */
+  .sec:not(.sec--product-row),
+  .hero {
+    text-align: var(--sec-align, left);
+  }
+
+  .sec__lead {
+    display: flex;
+    flex-direction: column;
+    align-items: var(--sec-items, flex-start);
+    gap: 1.25rem;
+    max-width: var(--sec-measure, 40rem);
+    margin-inline: var(--sec-lead-mi, 0);
+  }
+
+  .sec--image-text {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4rem;
+    align-items: center;
+  }
+
+  .sec--image-right .sec__media {
+    order: 1;
+  }
+
+  /* cover, not contain: a marketing shot fills its box, unlike a product
+     mockup. The surface tint stands in until there is a picture. */
+  .sec__media {
+    position: relative;
+    aspect-ratio: var(--sec-ratio, 4 / 5);
+    background: var(--color-surface);
+    overflow: hidden;
+  }
+
+  .sec__media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: var(--sec-fit, cover);
+  }
+
+  /* The one accent on the page: the button. */
+  .sec--cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: var(--sec-justify, space-between);
+    gap: 1.5rem 3rem;
+  }
+
+  .sec--cta .title {
+    max-width: 24ch;
+  }
+
+  /* The announcement bar is the one section that is not a band: a slim
+     strip, its line and link on one row. */
+  .sec--announcement {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: var(--sec-justify, center);
+    gap: 0.25rem 1.5rem;
+    padding: calc(0.875rem * var(--sec-pad-k, 1)) 0;
+  }
+
+  .sec__line {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+  }
+
+  /* The announcement's link and the product row's "view all". */
+  .sec__link {
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+  }
+
+  .sec--prose {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 3rem 4rem;
+    align-items: start;
+  }
+
+  /* One textarea, its blank lines kept as paragraph breaks; the FAQ's
+     answers the same. */
+  .sec__prose,
+  .sec__qa dd {
+    white-space: pre-line;
+  }
+
+  .sec__prose {
+    font-size: var(--text-lede);
+    line-height: 1.6;
+  }
+
+  /* The list sections: up to four items in a row under the lead, each a
+     title over a line. The lists carry the markup's meaning, not its look. */
+  .sec__grid,
+  .sec__logos,
+  .sec__faq {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Each modifier keeps its own number as the fallback, so an unset column
+     count renders exactly as it did before there was a setting. */
+  .sec__grid {
+    display: grid;
+    grid-template-columns: repeat(var(--sec-cols, 2), minmax(0, 1fr));
+    gap: 2.5rem var(--gutter);
+    margin: 3rem 0 0;
+  }
+
+  .sec__grid--three {
+    grid-template-columns: repeat(var(--sec-cols, 3), minmax(0, 1fr));
+  }
+
+  .sec__grid--four {
+    grid-template-columns: repeat(var(--sec-cols, 4), minmax(0, 1fr));
+  }
+
+  .sec__item {
+    display: flex;
+    flex-direction: column;
+    align-items: var(--sec-items, flex-start);
+    gap: 0.5rem;
+  }
+
+  .sec__item-title {
+    font-size: var(--text-lede);
+    font-weight: 500;
+    line-height: 1.35;
+  }
+
+  .sec__item-text {
+    color: var(--color-muted);
+  }
+
+  /* Steps count themselves. */
+  .sec__steps {
+    counter-reset: step;
+  }
+
+  .sec__step {
+    counter-increment: step;
+  }
+
+  .sec__step::before {
+    content: counter(step, decimal-leading-zero);
+    display: var(--sec-step-num, block);
+    margin-bottom: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-chrome);
+    color: var(--color-muted);
+  }
+
+  .sec__stat dd,
+  .sec__qa dd {
+    margin: 0;
+  }
+
+  .sec__figure {
+    font-size: var(--text-display);
+    line-height: 1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* stretch, not flex-start: this container sets no align-items today, and
+     shrink-to-fit would re-wrap every quote. */
+  .sec__quote {
+    display: flex;
+    flex-direction: column;
+    align-items: var(--sec-items, stretch);
+    gap: 1rem;
+    margin: 0;
+  }
+
+  .sec__quote blockquote {
+    margin: 0;
+    color: var(--color-text);
+  }
+
+  /* Questions and answers, each pair on its own line of the list. */
+  .sec__faq {
+    margin-top: 3rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .sec__qa {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 0.75rem 4rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .sec__qa:last-child {
+    border-bottom: 0;
+  }
+
+  /* Logo strip: the line and the marks on one row, each mark a picture or
+     a name. Outside edit mode a picture stands in for its name. */
+  .sec--logos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: var(--sec-justify, flex-start);
+    gap: 1.5rem 3rem;
+    padding: calc(2.5rem * var(--sec-pad-k, 1)) 0;
+  }
+
+  .sec__logos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: var(--sec-justify, flex-start);
+    gap: 1rem 3rem;
+  }
+
+  .sec__logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .sec__logo img {
+    width: auto;
+    max-width: 9rem;
+    height: var(--sec-logo-h, 1.75rem);
+    object-fit: contain;
+  }
+
+  .sec__logo-name {
+    font-family: var(--font-mono);
+    font-size: var(--text-nav);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .sec__logo--img .sec__logo-name {
+    display: none;
+  }
+
+  /* Image banner: the copy laid over the foot of a wide picture, on a scrim
+     so it reads on any shot. The overlay sits above the picture, so it is
+     what a click in the editor lands on. */
+  .sec__media--wide {
+    aspect-ratio: var(--sec-ratio, 21 / 9);
+  }
+
+  /* The scrim colour, named once so a section can restate the gradient's shape
+     without restating the colour. On the section root, not the media: a custom
+     property is substituted on the element that declares it, and
+     --sec-scrim-grad is declared there. */
+  .sec--image-banner {
+    --sec-scrim-c: color-mix(
+      in srgb,
+      var(--color-background) calc(var(--sec-scrim, 85) * 1%),
+      transparent
+    );
+  }
+
+  /* Opaque at the edge the copy sits against. The direction follows the
+     Text position setting, and a banner that has not moved its copy keeps
+     the bottom-up wash unchanged. */
+  .sec--image-banner .sec__media::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(
+      --sec-scrim-grad,
+      linear-gradient(var(--sec-scrim-dir, to top), var(--sec-scrim-c), transparent 60%)
+    );
+    pointer-events: none;
+  }
+
+  .sec__overlay {
+    position: absolute;
+    inset: var(--sec-overlay-inset, auto 0 0 0);
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: var(--sec-items, flex-start);
+    justify-content: var(--sec-overlay-justify, flex-end);
+    gap: 1rem;
+    padding: 2rem;
+  }
+
+  /* Category tiles: the product grid, with square pictures. */
+  .sec__tiles {
+    margin-top: 3rem;
+  }
+
+  .sec__media--square {
+    aspect-ratio: var(--sec-ratio, 1 / 1);
+  }
+
+  /* contain, like the product card: the spotlight shows a mockup, not a
+     marketing shot. */
+  .sec--product-spotlight .sec__media img {
+    object-fit: var(--sec-fit, contain);
+  }
+
+  /* Bleed, background and muted copy. LAST in this group on purpose: it sets
+     padding-inline, which `.sec`, `.sec--announcement`, `.sec--logos` and
+     `.hero` all reset through the `padding` shorthand at equal specificity. */
+  [data-section] {
+    margin-inline: var(--sec-mi, 0);
+    padding-inline: var(--sec-pi, 0);
+    /* background-color, not the `background` shorthand: this rule sits after
+       `.hero` at equal specificity, and the shorthand would reset the hero's
+       own background-image — its picture and scrim — back to none. */
+    background-color: var(--sec-bg, transparent);
+    color: var(--sec-fg, inherit);
+  }
+
+  /* Everything that hard-codes the page's muted grey, so an inverted band
+     takes its own muted colour with it. `.prose` (the Long text body) and the
+     Steps numbers set `color` themselves, so inheriting --sec-fg never reaches
+     them. The fallback keeps every other section byte-identical. */
+  [data-section] .eyebrow,
+  [data-section] .lede,
+  [data-section] .meta,
+  [data-section] .muted,
+  [data-section] .prose,
+  [data-section] .sec__item-text,
+  [data-section] .sec__logo-name,
+  [data-section] .sec__step::before {
+    color: var(--sec-muted, var(--color-muted));
+  }
+
+  @media (max-width: 899px) {
+    .sec--image-text {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    /* Picture first, whichever side it takes on a wide screen. */
+    .sec--image-right .sec__media {
+      order: 0;
+    }
+
+    .sec__media {
+      aspect-ratio: var(--sec-ratio-sm, 16 / 10);
+    }
+
+    .sec__media--wide,
+    .sec__media--square {
+      aspect-ratio: var(--sec-ratio-sm, 1 / 1);
+    }
+
+    .sec__overlay {
+      padding: var(--pad);
+    }
+
+    .sec--prose {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    /* Two at most on a narrow screen, but never more than the merchant
+       asked for: `--sec-cols-sm` is their own count, capped. */
+    .sec__grid--three,
+    .sec__grid--four {
+      grid-template-columns: repeat(var(--sec-cols-sm, 2), minmax(0, 1fr));
+    }
+
+    .sec__qa {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+  }
+
+  /* On a phone these are one column whatever the setting says: two quotes
+     side by side at 375px is a 160px measure, which is not a layout. */
+  @media (max-width: 479px) {
+    .sec__grid--three,
+    .sec__grid--four {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Category row, above the product list ------------------------------ */
+
+  /* Presentational only: the categories are still fetched and the count is
+     still computed; this hides them. */
+  .browse {
+    display: var(--sec-nav, flex);
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 1.75rem;
+    margin-bottom: 2rem;
+  }
+
+  .browse a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    font-family: var(--font-mono);
+    font-size: var(--text-nav);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+  }
+
+  .browse a[aria-current='page'] {
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+  }
+
+  /* The "12 products" line beside the products section's heading. */
+  .section__head .meta {
+    display: var(--sec-count, block);
+  }
+
+  /* Product grid and card --------------------------------------------- */
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--gutter);
+    row-gap: var(--row-gap);
+  }
+
+  @media (min-width: 1024px) {
+    .grid {
+      grid-template-columns: repeat(var(--sec-cols, 4), minmax(0, 1fr));
+    }
+  }
+
+  .card {
+    display: block;
+  }
+
+  .card:hover {
+    text-decoration: none;
+  }
+
+  /* contain, not cover: print-on-demand mockups are often square and cover
+     would crop the garment. The surface tint fills the 4:5 box. */
+  .card__media,
+  .figure,
+  .thumb,
+  .line__media {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    background: var(--color-surface);
+    overflow: hidden;
+  }
+
+  .card__media img,
+  .figure img,
+  .thumb img,
+  .line__media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  /* The one interaction on the grid: a cross-fade to the second shot. */
+  .card__media img + img {
+    opacity: 0;
+    transition: opacity var(--dur-media) linear;
+  }
+
+  .card:hover .card__media img + img,
+  .card:focus-visible .card__media img + img {
+    opacity: 1;
+  }
+
+  .card__body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding-top: 0.75rem;
+  }
+
+  .card__name {
+    font-size: var(--text-meta);
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: var(--track-wide);
+  }
+
+  .card__price {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card__price s {
+    margin-right: 0.5em;
+    text-decoration-thickness: 1px;
+  }
+
+  /* Buttons and inputs — one family ----------------------------------- */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 1.75rem;
+    border: 1px solid var(--color-primary);
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    text-align: center;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-ui) var(--ease),
+      color var(--dur-ui) var(--ease);
+  }
+
+  .btn:hover {
+    text-decoration: none;
+    background: var(--color-primary);
+    color: var(--color-secondary);
+  }
+
+  .btn--primary {
+    background: var(--color-primary);
+    color: var(--color-secondary);
+  }
+
+  /* A home section may ask for an outline button; the storefront's own
+     primary buttons, and every hover state, are untouched. */
+  [data-section] .btn--primary {
+    background: var(--sec-btn-bg, var(--color-primary));
+    color: var(--sec-btn-fg, var(--color-secondary));
+  }
+
+  /* Hover inverts rather than tints, so it holds for any palette. */
+  .btn--primary:hover {
+    background: var(--color-background);
+    color: var(--color-primary);
+  }
+
+  .btn:active {
+    transform: translateY(1px);
+  }
+
+  .btn--block {
+    display: flex;
+    width: 100%;
+  }
+
+  .btn--small {
+    min-height: 36px;
+    padding: 0 1rem;
+  }
+
+  .btn[disabled] {
+    border-color: var(--color-border);
+    background: var(--color-border);
+    color: var(--color-muted);
+    cursor: not-allowed;
+  }
+
+  .btn[disabled]:hover {
+    background: var(--color-border);
+    color: var(--color-muted);
+  }
+
+  .btn[disabled]:active {
+    transform: none;
+  }
+
+  /* Bare text button, for destructive-but-minor actions like Remove. The
+     min-height matches .btn--small so it centres against one. */
+  .linkbtn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+    cursor: pointer;
+    transition: color var(--dur-ui) var(--ease);
+  }
+
+  .linkbtn:hover {
+    color: var(--color-text);
+  }
+
+  .field {
+    display: block;
+    margin-bottom: 1.25rem;
+  }
+
+  .field__label,
+  .label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  /* 1rem, not the 14px body size — anything smaller makes iOS zoom on focus.
+     The border is mixed towards the text colour so a control edge clears 3:1
+     on any palette, while hairlines elsewhere stay quiet. */
+  .input {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 0.875rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 65%, var(--color-text));
+    border-radius: 0;
+    background: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    letter-spacing: 0.01em;
+    transition: border-color var(--dur-ui) var(--ease);
+  }
+
+  .input:hover {
+    border-color: var(--color-muted);
+  }
+
+  .input:focus {
+    border-color: var(--color-primary);
+  }
+
+  select.input {
+    appearance: none;
+    padding-right: 2.5rem;
+    background-image: var(
+      --select-chevron,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239e9e9e' stroke-width='1.2'/%3E%3C/svg%3E")
+    );
+    background-repeat: no-repeat;
+    background-position: right 0.875rem center;
+    background-size: 10px 6px;
+    cursor: pointer;
+  }
+
+  .field--qty {
+    max-width: 7rem;
+  }
+
+  .error {
+    margin-bottom: 1.5rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-text);
+    background: var(--color-surface);
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+  }
+
+  /* Empty states ------------------------------------------------------ */
+
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 5rem 0 6rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .empty--bare {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  /* Product detail ---------------------------------------------------- */
+
+  .pdp {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 4rem;
+    align-items: start;
+  }
+
+  .pdp__media {
+    display: grid;
+    gap: var(--gutter);
+  }
+
+  /* Below both columns, not beside them: the grid is two tracks wide and this
+     spans them, so the row of cards reads as the page's own, not the info
+     column's. */
+  /* The same weight as the price it sits above: a shopper deciding to buy
+     should read it before they read what it costs. */
+  .pdp__demo {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+    color: var(--color-primary);
+  }
+
+  .pdp__more {
+    grid-column: 1 / -1;
+    margin-top: var(--section);
+  }
+
+  .pdp__info {
+    position: sticky;
+    top: calc(var(--header-h) + 2rem);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  @media (max-width: 899px) {
+    .pdp {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .pdp__info {
+      position: static;
+    }
+
+    /* One swipeable row beats a tall stack of images above the price. */
+    .pdp__media {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      margin: 0 calc(var(--pad) * -1);
+      padding: 0 var(--pad);
+      scrollbar-width: none;
+    }
+
+    .pdp__media::-webkit-scrollbar {
+      display: none;
+    }
+
+    .pdp__media .figure {
+      flex: 0 0 86%;
+      scroll-snap-align: center;
+    }
+  }
+
+  .pdp__price {
+    font-family: var(--font-mono);
+    font-size: var(--text-lede);
+    letter-spacing: var(--track-wide);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pdp__price s {
+    margin-right: 0.5em;
+    color: var(--color-muted);
+    text-decoration-thickness: 1px;
+  }
+
+  .pdp__form {
+    width: 100%;
+    margin-top: 0.75rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .pdp__form .field:last-of-type {
+    margin-bottom: 1.75rem;
+  }
+
+  /* Product options ---------------------------------------------------- */
+
+  /* The label carries the option's name and, when it has one, the marker
+     that says it must be answered — so the row is a flex, not a block. */
+  .field__label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .field__note {
+    color: var(--color-muted);
+    text-transform: none;
+    letter-spacing: var(--track-wide);
+  }
+
+  .field__hint {
+    margin: -0.25rem 0 0.5rem;
+    font-size: var(--text-meta);
+    color: var(--color-muted);
+  }
+
+  /* `.input` centres one line of text on a 48px row, which is wrong for a
+     box the shopper writes several lines into. */
+  .input--area {
+    min-height: 6rem;
+    padding: 0.75rem 0.875rem;
+    line-height: 1.5;
+    resize: vertical;
+  }
+
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 48px;
+    cursor: pointer;
+  }
+
+  .check__box {
+    width: 1.125rem;
+    height: 1.125rem;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+  }
+
+  /* A conditional option the parent has not asked for. Hidden rather than
+     absent so the control keeps its place in the form when it comes back. */
+  .field[hidden] {
+    display: none;
+  }
+
+  .pdp__block {
+    width: 100%;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .pdp__block > .section__title + * {
+    margin-top: 1.25rem;
+  }
+
+  /* Cart, checkout ---------------------------------------------------- */
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: 4rem;
+    align-items: start;
+  }
+
+  @media (max-width: 899px) {
+    .split {
+      grid-template-columns: 1fr;
+      gap: 2.5rem;
+    }
+  }
+
+  .lines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .line {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) auto;
+    gap: var(--gutter);
+    align-items: start;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  @media (max-width: 599px) {
+    .line {
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 1rem;
+    }
+
+    .line__total {
+      grid-column: 2;
+      text-align: left;
+    }
+  }
+
+  .line__body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+  }
+
+  .line__name {
+    font-size: var(--text-body);
+    font-weight: 400;
+    letter-spacing: var(--track-wide);
+  }
+
+  .line__opts {
+    /* A shopper's own text lands here, and it may be one long unbroken run. */
+    overflow-wrap: anywhere;
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+    color: var(--color-muted);
+  }
+
+  .line__actions {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .line__actions form {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
+  .line__qty {
+    width: 4.5rem;
+    min-height: 36px;
+    padding: 0 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    background: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .line__qty:focus {
+    border-color: var(--color-primary);
+  }
+
+  .line__total {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .summary {
+    position: sticky;
+    top: calc(var(--header-h) + 2rem);
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-text);
+  }
+
+  @media (max-width: 899px) {
+    .summary {
+      position: static;
+    }
+  }
+
+  .summary .section__title {
+    margin-bottom: 0.75rem;
+  }
+
+  .summary__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .summary__row--total {
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: var(--text-body);
+  }
+
+  .summary .btn {
+    margin-top: 1.5rem;
+  }
+
+  .summary__note {
+    margin-top: 1rem;
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+    color: var(--color-muted);
+  }
+
+  /* Shipping services, orders ----------------------------------------- */
+
+  .services {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .service {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1.5rem;
+    padding: 1.125rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .service__name {
+    letter-spacing: var(--track-wide);
+  }
+
+  .service__desc {
+    margin-top: 0.25rem;
+    font-size: var(--text-meta);
+    color: var(--color-muted);
+  }
+
+  .service__price {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .orders {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .order {
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .order__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .order__number {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+  }
+
+  .order__total {
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .order__meta {
+    margin-top: 0.375rem;
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+    color: var(--color-muted);
+  }
+
+  .shipments {
+    list-style: none;
+    margin: 1.5rem 0 0;
+    padding: 1.25rem 1.25rem 1.25rem;
+    background: var(--color-surface);
+  }
+
+  .shipment + .shipment {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .shipment__carrier {
+    font-size: var(--text-meta);
+    letter-spacing: var(--track-wide);
+  }
+
+  .shipment__tracking,
+  .shipment__date {
+    margin-top: 0.25rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-wide);
+    color: var(--color-muted);
+  }
+
+  /* Account ----------------------------------------------------------- */
+
+  .narrow {
+    max-width: 24rem;
+  }
+
+  .linklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--color-border);
+    max-width: 24rem;
+  }
+
+  .linklist a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.125rem 0;
+    border-bottom: 1px solid var(--color-border);
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+  }
+
+  .linklist a:hover {
+    text-decoration: none;
+    color: var(--color-muted);
+  }
+
+  .linklist a::after {
+    content: '\2192';
+    letter-spacing: 0;
+  }
+
+  .form-links {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .form-links a {
+    color: var(--color-text);
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+  }
+
+  /* Cart drawer ------------------------------------------------------- */
+
+  .drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+  }
+
+  .drawer__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 0.55);
+    opacity: 0;
+    transition: opacity var(--dur-ui) var(--ease);
+  }
+
+  .drawer__panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(28rem, 100%);
+    display: flex;
+    flex-direction: column;
+    background: var(--color-background);
+    color: var(--color-text);
+    border-left: 1px solid var(--color-border);
+    transform: translateX(100%);
+    transition: transform 240ms var(--ease);
+  }
+
+  .drawer.is-open .drawer__backdrop {
+    opacity: 1;
+  }
+
+  .drawer.is-open .drawer__panel {
+    transform: none;
+  }
+
+  body.drawer-open {
+    overflow: hidden;
+  }
+
+  .drawer__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: var(--header-h);
+    padding: 0 var(--pad);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .drawer__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-right: -0.75rem;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity var(--dur-ui) var(--ease);
+  }
+
+  .drawer__close:hover {
+    opacity: 1;
+  }
+
+  .drawer__status {
+    min-height: 1.25rem;
+    padding: 0.75rem var(--pad) 0;
+  }
+
+  /* The error and the way out of it, on the cart page. */
+  .notice-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .notice-error .error {
+    margin: 0;
+  }
+
+  .drawer__status:empty {
+    padding: 0;
+  }
+
+  .drawer__lines {
+    flex: 1;
+    list-style: none;
+    margin: 0;
+    padding: 0 var(--pad);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .drawer__line {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: start;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--color-border);
+    transition: opacity var(--dur-ui) var(--ease);
+  }
+
+  .drawer__line.is-pending {
+    opacity: 0.55;
+  }
+
+  .drawer__body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .drawer__name {
+    font-size: var(--text-body);
+    letter-spacing: var(--track-wide);
+  }
+
+  .drawer__controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .drawer__qty {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid color-mix(in srgb, var(--color-border) 65%, var(--color-text));
+  }
+
+  .drawer__step {
+    width: 36px;
+    height: 36px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-family: var(--font-mono);
+    cursor: pointer;
+  }
+
+  .drawer__step:hover {
+    background: var(--color-surface);
+  }
+
+  .drawer__value {
+    min-width: 2rem;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .drawer__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+    padding: 2.5rem var(--pad);
+  }
+
+  .drawer__foot {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem var(--pad) calc(1.25rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-border);
+  }
+
+  .drawer__foot .summary__row--total {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .drawer__link {
+    justify-self: center;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+
+    .btn:active {
+      transform: none;
+    }
+  }
+</style>

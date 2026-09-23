@@ -1,0 +1,462 @@
+{
+  "label": "Sections",
+  "description": "Three pages keep their own list of sections: home, product and category. Only the home page's list is a field here; the product and category lists sit in this same panel, but the dashboard does not offer them, so they are edited at /editor. The product and category pages each keep a required section as well: Product detail on the product page, Category products on the category page. It is what the page exists to show, so it has nothing to set of its own and is not among the Type options here or in the editor's add list. It can be moved but not hidden or deleted, so marketing sections sit above and below it. Every other type can go on any of the three pages, in any number: a hero, a block of text, an image beside text, a call to action, the product grid, an announcement bar, long text, features, steps, stats, testimonials, an FAQ, a logo strip, an image banner, category tiles, a product spotlight or a product row. Every section shows every field here, and only the ones its type uses take effect — each field says which types read it, and a value set on a type that does not read it is discarded the next time the list is read, not merely ignored. Items A to D are the points, steps, figures, quotes, questions or marks of the list sections. The appearance settings — alignment, spacing, width, background, divider, columns, image shape and fit, overlay, button style, text position, logo size, step numbers, category row and product count — change how a section looks without touching its copy. Copy fields can be translated per locale. A hidden section is left off the page entirely; it stays in the editor's list, with its eye, so it can be shown again. Hide every section on the home page and shoppers get nothing between the header and the footer. Leave the home list empty for the standard hero and product grid; empty a product or category list and its required section is left on its own. The editor at /editor adds, reorders, hides and deletes sections, changes their appearance and edits their copy in place; it will not save more than 20 sections on a page.",
+  "fields": [
+    {
+      "id": "home",
+      "label": "Home page",
+      "type": "collection",
+      "item_label": "type",
+      "description": "Sections render top to bottom in this order. This is the home page's list alone; the product and category pages keep their own, which are not fields here — they are edited at /editor.",
+      "fields": [
+        {
+          "id": "id",
+          "label": "Section id",
+          "type": "short_text",
+          "description": "How the editor tells sections apart. Leave empty to have one assigned; changing it later resets nothing but the editor's bookkeeping."
+        },
+        {
+          "id": "type",
+          "label": "Type",
+          "type": "select",
+          "required": true,
+          "default": "text",
+          "options": [
+            {
+              "value": "hero",
+              "label": "Hero"
+            },
+            {
+              "value": "text",
+              "label": "Text"
+            },
+            {
+              "value": "image_text",
+              "label": "Image and text"
+            },
+            {
+              "value": "cta",
+              "label": "Call to action"
+            },
+            {
+              "value": "products",
+              "label": "Products"
+            },
+            {
+              "value": "announcement",
+              "label": "Announcement bar"
+            },
+            {
+              "value": "prose",
+              "label": "Long text"
+            },
+            {
+              "value": "features",
+              "label": "Features"
+            },
+            {
+              "value": "steps",
+              "label": "Steps"
+            },
+            {
+              "value": "stats",
+              "label": "Stats"
+            },
+            {
+              "value": "testimonials",
+              "label": "Testimonials"
+            },
+            {
+              "value": "faq",
+              "label": "FAQ"
+            },
+            {
+              "value": "logos",
+              "label": "Logo strip"
+            },
+            {
+              "value": "image_banner",
+              "label": "Image banner"
+            },
+            {
+              "value": "categories",
+              "label": "Categories"
+            },
+            {
+              "value": "product_spotlight",
+              "label": "Product spotlight"
+            },
+            {
+              "value": "product_row",
+              "label": "Product row"
+            }
+          ],
+          "fallback": false
+        },
+        {
+          "id": "hidden",
+          "label": "Hidden",
+          "type": "toggle",
+          "default": false,
+          "description": "Every type. Keeps the section off the page. It stays in the editor's list, with its eye, so it can be shown again — the page itself leaves it out entirely.",
+          "fallback": false
+        },
+        {
+          "id": "eyebrow",
+          "label": "Eyebrow",
+          "type": "text",
+          "localized": true,
+          "description": "Every type but the call to action, announcement bar, products, logo strip and product row. The small line above the heading."
+        },
+        {
+          "id": "heading",
+          "label": "Heading",
+          "type": "text",
+          "localized": true,
+          "description": "Every type."
+        },
+        {
+          "id": "body",
+          "label": "Body",
+          "type": "long_text",
+          "localized": true,
+          "description": "Hero, text, image and text, long text, FAQ, image banner, product spotlight. In long text and the FAQ, a blank line starts a new paragraph."
+        },
+        {
+          "id": "image",
+          "label": "Image",
+          "type": "image",
+          "description": "Image and text, shown at 4:5; image banner, shown wide; hero, as a background picture behind the copy, under the scrim its Overlay setting asks for. Cropped to fit, and the Image shape and Image fit settings change that. Not the other types — a value set there is discarded the next time the list is read. Uploading a file keeps the picture on this store's own CDN; pasting a third-party URL makes every shopper's browser request that host."
+        },
+        {
+          "id": "layout",
+          "label": "Layout",
+          "type": "select",
+          "default": "image_left",
+          "options": [
+            {
+              "value": "image_left",
+              "label": "Image left"
+            },
+            {
+              "value": "image_right",
+              "label": "Image right"
+            }
+          ],
+          "description": "Image and text, product spotlight. Which side the picture sits on.",
+          "fallback": false
+        },
+        {
+          "id": "cta_label",
+          "label": "Button label",
+          "type": "text",
+          "localized": true,
+          "description": "Call to action, announcement bar, image banner, product spotlight, product row."
+        },
+        {
+          "id": "cta_url",
+          "label": "Button link",
+          "type": "short_text",
+          "placeholder": "/categories/tees",
+          "description": "Call to action, announcement bar, image banner, product row. A path on this store, or a full http(s) URL. The product spotlight's button links to its product."
+        },
+        {
+          "id": "category",
+          "label": "Category slug",
+          "type": "short_text",
+          "placeholder": "tees",
+          "description": "Products, product row. Leave empty for the newest products."
+        },
+        {
+          "id": "product",
+          "label": "Product slug",
+          "type": "short_text",
+          "placeholder": "heavyweight-hoodie",
+          "description": "Product spotlight. Leave empty for the newest product."
+        },
+        {
+          "id": "limit",
+          "label": "Items shown",
+          "type": "number",
+          "default": 12,
+          "min": 1,
+          "max": 48,
+          "description": "Products, product row, categories. Between 1 and 48.",
+          "fallback": false
+        },
+        {
+          "id": "title_a",
+          "label": "Item A title",
+          "type": "text",
+          "localized": true,
+          "description": "Item A. Features, steps and FAQ: the title, step or question; stats: the figure; testimonials: who said it; logo strip: the name."
+        },
+        {
+          "id": "text_a",
+          "label": "Item A text",
+          "type": "long_text",
+          "localized": true,
+          "description": "Item A. Features and steps: the line under the title; stats: the label under the figure; testimonials: the quote; FAQ: the answer."
+        },
+        {
+          "id": "image_a",
+          "label": "Item A image",
+          "type": "image",
+          "description": "Item A. Logo strip: the mark, shown in place of the name."
+        },
+        {
+          "id": "title_b",
+          "label": "Item B title",
+          "type": "text",
+          "localized": true,
+          "description": "Item B. Features, steps and FAQ: the title, step or question; stats: the figure; testimonials: who said it; logo strip: the name."
+        },
+        {
+          "id": "text_b",
+          "label": "Item B text",
+          "type": "long_text",
+          "localized": true,
+          "description": "Item B. Features and steps: the line under the title; stats: the label under the figure; testimonials: the quote; FAQ: the answer."
+        },
+        {
+          "id": "image_b",
+          "label": "Item B image",
+          "type": "image",
+          "description": "Item B. Logo strip: the mark, shown in place of the name."
+        },
+        {
+          "id": "title_c",
+          "label": "Item C title",
+          "type": "text",
+          "localized": true,
+          "description": "Item C. Features, steps and FAQ: the title, step or question; stats: the figure; testimonials: who said it; logo strip: the name."
+        },
+        {
+          "id": "text_c",
+          "label": "Item C text",
+          "type": "long_text",
+          "localized": true,
+          "description": "Item C. Features and steps: the line under the title; stats: the label under the figure; testimonials: the quote; FAQ: the answer."
+        },
+        {
+          "id": "image_c",
+          "label": "Item C image",
+          "type": "image",
+          "description": "Item C. Logo strip: the mark, shown in place of the name."
+        },
+        {
+          "id": "title_d",
+          "label": "Item D title",
+          "type": "text",
+          "localized": true,
+          "description": "Item D. Features, steps and FAQ: the title, step or question; stats: the figure; testimonials: who said it; logo strip: the name. Steps and testimonials have three items and skip this one."
+        },
+        {
+          "id": "text_d",
+          "label": "Item D text",
+          "type": "long_text",
+          "localized": true,
+          "description": "Item D. Features and steps: the line under the title; stats: the label under the figure; testimonials: the quote; FAQ: the answer. Steps and testimonials have three items and skip this one."
+        },
+        {
+          "id": "image_d",
+          "label": "Item D image",
+          "type": "image",
+          "description": "Item D. Logo strip: the mark, shown in place of the name."
+        },
+        {
+          "id": "align",
+          "label": "Text alignment",
+          "type": "select",
+          "default": "left",
+          "options": [
+            { "value": "left", "label": "Left" },
+            { "value": "center", "label": "Center" },
+            { "value": "right", "label": "Right" }
+          ],
+          "description": "Every type. Where the copy sits in the band. The announcement bar starts centered; every other type starts left. On the products and product row sections this moves the heading row only — the product names and prices stay left.",
+          "fallback": false
+        },
+        {
+          "id": "padding",
+          "label": "Spacing",
+          "type": "select",
+          "default": "normal",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "small", "label": "Small" },
+            { "value": "normal", "label": "Normal" },
+            { "value": "large", "label": "Large" }
+          ],
+          "description": "Every type. How much air the section gets above and below, as a multiple of its own rhythm — so the announcement bar stays slim and the hero stays tall.",
+          "fallback": false
+        },
+        {
+          "id": "width",
+          "label": "Width",
+          "type": "select",
+          "default": "normal",
+          "options": [
+            { "value": "normal", "label": "Normal (measure)" },
+            { "value": "wide", "label": "Wide (full container)" },
+            { "value": "full", "label": "Full bleed" }
+          ],
+          "description": "Every type. Normal keeps the section's own measure; Wide drops it; Full bleed runs edge to edge. Wide only applies to the hero, text, long text, features, steps, stats, testimonials and FAQ; on any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "background",
+          "label": "Background",
+          "type": "select",
+          "default": "none",
+          "options": [
+            { "value": "none", "label": "Page" },
+            { "value": "surface", "label": "Surface tint" },
+            { "value": "inverted", "label": "Inverted" }
+          ],
+          "description": "Hero, text, image and text, call to action, announcement bar, long text, features, steps, stats, testimonials, FAQ, logo strip, product spotlight. Not the products, product row, categories or image banner sections — a value set there is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "divider",
+          "label": "Divider",
+          "type": "select",
+          "default": "line",
+          "options": [
+            { "value": "line", "label": "Hairline below" },
+            { "value": "none", "label": "None" }
+          ],
+          "description": "Every type. The hairline under the section. Starts off on the products section, which has never had one, and on for every other type.",
+          "fallback": false
+        },
+        {
+          "id": "columns",
+          "label": "Columns",
+          "type": "select",
+          "default": "4",
+          "options": [
+            { "value": "1", "label": "One" },
+            { "value": "2", "label": "Two" },
+            { "value": "3", "label": "Three" },
+            { "value": "4", "label": "Four" }
+          ],
+          "description": "Products, features, stats, testimonials, categories, product row — on screens wider than 1024px; narrower ones keep two, then one. Testimonials offer one to three and start at three; the rest offer two to four and start at four. On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "ratio",
+          "label": "Image shape",
+          "type": "select",
+          "default": "portrait",
+          "options": [
+            { "value": "portrait", "label": "Portrait 4:5" },
+            { "value": "square", "label": "Square" },
+            { "value": "landscape", "label": "Landscape 16:10" },
+            { "value": "wide", "label": "Wide 21:9" }
+          ],
+          "description": "Image and text (starts portrait), image banner (starts wide), categories — the tile shape (starts square), product spotlight (starts portrait). On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "image_fit",
+          "label": "Image fit",
+          "type": "select",
+          "default": "cover",
+          "options": [
+            { "value": "cover", "label": "Fill the box" },
+            { "value": "contain", "label": "Fit inside" }
+          ],
+          "description": "Image and text (starts at Fill the box) and product spotlight (starts at Fit inside, like a product card). On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "overlay",
+          "label": "Overlay",
+          "type": "select",
+          "default": "soft",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "soft", "label": "Soft scrim" },
+            { "value": "strong", "label": "Strong scrim" }
+          ],
+          "description": "Hero and image banner, both starting at Soft scrim — the wash that keeps copy readable over a picture. On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "button_style",
+          "label": "Button style",
+          "type": "select",
+          "default": "primary",
+          "options": [
+            { "value": "primary", "label": "Filled" },
+            { "value": "outline", "label": "Outline" }
+          ],
+          "description": "Call to action, image banner, product spotlight. Buttons elsewhere on the store are untouched. On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "text_position",
+          "label": "Text position",
+          "type": "select",
+          "default": "bottom",
+          "options": [
+            { "value": "top", "label": "Top" },
+            { "value": "middle", "label": "Middle" },
+            { "value": "bottom", "label": "Bottom" }
+          ],
+          "description": "Image banner only. Where the copy sits over the picture. On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "logo_size",
+          "label": "Logo size",
+          "type": "select",
+          "default": "medium",
+          "options": [
+            { "value": "small", "label": "Small" },
+            { "value": "medium", "label": "Medium" },
+            { "value": "large", "label": "Large" }
+          ],
+          "description": "Logo strip only. How tall each mark is drawn. On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "show_nav",
+          "label": "Category row",
+          "type": "select",
+          "default": "show",
+          "options": [
+            { "value": "show", "label": "Show" },
+            { "value": "hide", "label": "Hide" }
+          ],
+          "description": "Products only. The row of category links above the grid. On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "show_count",
+          "label": "Product count",
+          "type": "select",
+          "default": "show",
+          "options": [
+            { "value": "show", "label": "Show" },
+            { "value": "hide", "label": "Hide" }
+          ],
+          "description": "Products only. The \"12 products\" line beside the heading. On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        },
+        {
+          "id": "numbering",
+          "label": "Step numbers",
+          "type": "select",
+          "default": "numbers",
+          "options": [
+            { "value": "numbers", "label": "Numbered" },
+            { "value": "none", "label": "None" }
+          ],
+          "description": "Steps only. The 01 / 02 / 03 above each step. On any other type the value is discarded the next time the list is read.",
+          "fallback": false
+        }
+      ]
+    }
+  ]
+}

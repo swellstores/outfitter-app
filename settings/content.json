@@ -1,0 +1,1247 @@
+{
+  "label": "Content",
+  "description": "The store's own words: every heading, label, button and message the shop shows, grouped by page. Each field can be translated per locale. Product, category, cart and order details come from the catalog and are not here.",
+  "fields": [
+    {
+      "type": "field_group",
+      "label": "Global",
+      "fields": [
+        {
+          "id": "global_skip_link",
+          "label": "Skip link",
+          "type": "text",
+          "localized": true,
+          "default": "Skip to content",
+          "description": "Keyboard shortcut link at the top of every page.",
+          "fallback": false
+        },
+        {
+          "id": "global_nav_main_label",
+          "label": "Main navigation name",
+          "type": "text",
+          "localized": true,
+          "default": "Main",
+          "description": "Screen-reader name of the header navigation.",
+          "fallback": false
+        },
+        {
+          "id": "global_nav_shop",
+          "label": "Header: Shop link",
+          "type": "text",
+          "localized": true,
+          "default": "Shop",
+          "fallback": false
+        },
+        {
+          "id": "global_nav_secondary_label",
+          "label": "Account navigation name",
+          "type": "text",
+          "localized": true,
+          "default": "Account and cart",
+          "description": "Screen-reader name of the account and cart navigation.",
+          "fallback": false
+        },
+        {
+          "id": "global_nav_account",
+          "label": "Header: Account link",
+          "type": "text",
+          "localized": true,
+          "default": "Account",
+          "fallback": false
+        },
+        {
+          "id": "global_nav_cart",
+          "label": "Header: Cart link",
+          "type": "text",
+          "localized": true,
+          "default": "Cart",
+          "description": "The item count follows automatically.",
+          "fallback": false
+        },
+        {
+          "id": "global_localization_language",
+          "label": "Header: Language control name",
+          "type": "text",
+          "localized": true,
+          "default": "Language",
+          "description": "Screen-reader name of the language menu. Shown only when the store has more than one locale.",
+          "fallback": false
+        },
+        {
+          "id": "global_localization_currency",
+          "label": "Header: Currency control name",
+          "type": "text",
+          "localized": true,
+          "default": "Currency",
+          "description": "Screen-reader name of the currency menu. Shown only when the store has more than one currency.",
+          "fallback": false
+        },
+        {
+          "id": "global_localization_apply",
+          "label": "Header: Apply button",
+          "type": "text",
+          "localized": true,
+          "default": "Apply",
+          "description": "Applies a language or currency choice when scripts are off; otherwise the menus apply on change.",
+          "fallback": false
+        },
+        {
+          "id": "global_footer_label",
+          "label": "Footer navigation name",
+          "type": "text",
+          "localized": true,
+          "default": "Footer",
+          "description": "Screen-reader name of the footer navigation.",
+          "fallback": false
+        },
+        {
+          "id": "global_footer_shop",
+          "label": "Footer: Shop link",
+          "type": "text",
+          "localized": true,
+          "default": "Shop",
+          "fallback": false
+        },
+        {
+          "id": "global_footer_account",
+          "label": "Footer: Account link",
+          "type": "text",
+          "localized": true,
+          "default": "Account",
+          "fallback": false
+        },
+        {
+          "id": "global_footer_cart",
+          "label": "Footer: Cart link",
+          "type": "text",
+          "localized": true,
+          "default": "Cart",
+          "fallback": false
+        },
+        {
+          "id": "global_footer_support",
+          "label": "Footer: Support link",
+          "type": "text",
+          "localized": true,
+          "default": "Support",
+          "description": "Shown only when the store has a support email.",
+          "fallback": false
+        },
+        {
+          "id": "demo_footer_notice",
+          "label": "Demo notice: footer",
+          "type": "text",
+          "localized": true,
+          "default": "This is a demo store. Orders placed here are not fulfilled.",
+          "description": "Shown in the footer of every page while Demo store is on in the app settings.",
+          "fallback": false
+        },
+        {
+          "id": "demo_product_notice",
+          "label": "Demo notice: product",
+          "type": "text",
+          "localized": true,
+          "default": "Demo store — this product will not be made or shipped.",
+          "description": "Shown with every product while Demo store is on in the app settings.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_title",
+          "label": "Cart drawer: title",
+          "type": "text",
+          "localized": true,
+          "default": "Cart",
+          "description": "The item count follows automatically.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_close",
+          "label": "Cart drawer: close button",
+          "type": "text",
+          "localized": true,
+          "default": "Close cart",
+          "description": "Screen-reader label of the × button.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_empty",
+          "label": "Cart drawer: empty message",
+          "type": "text",
+          "localized": true,
+          "default": "Your cart is empty.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_browse",
+          "label": "Cart drawer: browse button",
+          "type": "text",
+          "localized": true,
+          "default": "Browse the shop",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_subtotal",
+          "label": "Cart drawer: subtotal label",
+          "type": "text",
+          "localized": true,
+          "default": "Subtotal",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_checkout",
+          "label": "Cart drawer: checkout button",
+          "type": "text",
+          "localized": true,
+          "default": "Checkout",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_view_cart",
+          "label": "Cart drawer: view cart link",
+          "type": "text",
+          "localized": true,
+          "default": "View cart",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_adding",
+          "label": "Cart drawer: adding status",
+          "type": "text",
+          "localized": true,
+          "default": "Adding…",
+          "description": "Shown while an item is being added.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_updating",
+          "label": "Cart drawer: updating status",
+          "type": "text",
+          "localized": true,
+          "default": "Updating…",
+          "description": "Shown while a quantity change is saved.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_removing",
+          "label": "Cart drawer: removing status",
+          "type": "text",
+          "localized": true,
+          "default": "Removing…",
+          "description": "Shown while a line is removed.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_remove",
+          "label": "Cart drawer: remove button",
+          "type": "text",
+          "localized": true,
+          "default": "Remove",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_qty",
+          "label": "Cart drawer: quantity prefix",
+          "type": "text",
+          "localized": true,
+          "default": "Qty",
+          "description": "Precedes the number on a line that is still being added.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_decrease",
+          "label": "Cart drawer: decrease button",
+          "type": "text",
+          "localized": true,
+          "default": "Decrease quantity",
+          "description": "Screen-reader label of the − button.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_increase",
+          "label": "Cart drawer: increase button",
+          "type": "text",
+          "localized": true,
+          "default": "Increase quantity",
+          "description": "Screen-reader label of the + button.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_error",
+          "label": "Cart drawer: update failed",
+          "type": "text",
+          "localized": true,
+          "default": "Your cart could not be updated.",
+          "description": "Shown when a cart change fails without a specific reason.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_add_failed",
+          "label": "Cart drawer: add failed",
+          "type": "text",
+          "localized": true,
+          "default": "That could not be added to your cart. Please try again.",
+          "description": "Shown when adding an item fails.",
+          "fallback": false
+        },
+        {
+          "id": "global_drawer_add_rejected",
+          "label": "Cart drawer: add rejected",
+          "type": "text",
+          "localized": true,
+          "default": "That could not be added to your cart.",
+          "description": "Shown when the store rejects an item without a reason.",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "type": "field_group",
+      "label": "Home",
+      "fields": [
+        {
+          "id": "home_meta_description",
+          "label": "Search description",
+          "type": "text",
+          "localized": true,
+          "default": "Company merch, printed on demand.",
+          "description": "The page description search engines show. Not visible on the page.",
+          "fallback": false
+        },
+        {
+          "id": "home_categories_label",
+          "label": "Category navigation name",
+          "type": "text",
+          "localized": true,
+          "default": "Categories",
+          "description": "Screen-reader name of the category links.",
+          "fallback": false
+        },
+        {
+          "id": "home_browse_eyebrow",
+          "label": "Browse label",
+          "type": "text",
+          "localized": true,
+          "default": "Browse",
+          "description": "Precedes the category links.",
+          "fallback": false
+        },
+        {
+          "id": "home_count_one",
+          "label": "Count, singular",
+          "type": "text",
+          "localized": true,
+          "default": "style",
+          "description": "Follows the number of products, e.g. 1 style.",
+          "fallback": false
+        },
+        {
+          "id": "home_count_other",
+          "label": "Count, plural",
+          "type": "text",
+          "localized": true,
+          "default": "styles",
+          "description": "Follows the number of products, e.g. 12 styles.",
+          "fallback": false
+        },
+        {
+          "id": "home_empty_title",
+          "label": "Empty state title",
+          "type": "text",
+          "localized": true,
+          "default": "Nothing here yet",
+          "fallback": false
+        },
+        {
+          "id": "home_empty_body",
+          "label": "Empty state body",
+          "type": "long_text",
+          "localized": true,
+          "default": "Add products in the dashboard and they appear on this page.",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "type": "field_group",
+      "label": "Product",
+      "fields": [
+        {
+          "id": "product_option_error",
+          "label": "Missing option message",
+          "type": "text",
+          "localized": true,
+          "default": "Answer the options above before adding this to the cart.",
+          "description": "Shown above the add to cart button when a required option has been left empty.",
+          "fallback": false
+        },
+        {
+          "id": "product_option_choose",
+          "label": "Option placeholder",
+          "type": "text",
+          "localized": true,
+          "default": "Choose",
+          "description": "The empty first row of an option's menu. An option with its own hint shows that instead.",
+          "fallback": false
+        },
+        {
+          "id": "product_quantity_label",
+          "label": "Quantity label",
+          "type": "text",
+          "localized": true,
+          "default": "Quantity",
+          "fallback": false
+        },
+        {
+          "id": "product_add_to_cart",
+          "label": "Add to cart button",
+          "type": "text",
+          "localized": true,
+          "default": "Add to cart",
+          "fallback": false
+        },
+        {
+          "id": "product_sold_out",
+          "label": "Sold out button",
+          "type": "text",
+          "localized": true,
+          "default": "Out of stock",
+          "fallback": false
+        },
+        {
+          "id": "product_details_title",
+          "label": "Details title",
+          "type": "text",
+          "localized": true,
+          "default": "Details",
+          "fallback": false
+        },
+        {
+          "id": "product_recommended_title",
+          "label": "Recommended products title",
+          "type": "text",
+          "localized": true,
+          "default": "Recommended products",
+          "fallback": false
+        },
+        {
+          "id": "product_not_found_page_title",
+          "label": "Not found: browser tab title",
+          "type": "text",
+          "localized": true,
+          "default": "Not found",
+          "fallback": false
+        },
+        {
+          "id": "product_not_found_eyebrow",
+          "label": "Not found: eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "404",
+          "fallback": false
+        },
+        {
+          "id": "product_not_found_title",
+          "label": "Not found: title",
+          "type": "text",
+          "localized": true,
+          "default": "Product not found",
+          "fallback": false
+        },
+        {
+          "id": "product_not_found_body",
+          "label": "Not found: body",
+          "type": "long_text",
+          "localized": true,
+          "default": "It may have sold out or been renamed.",
+          "fallback": false
+        },
+        {
+          "id": "product_not_found_back",
+          "label": "Not found: back button",
+          "type": "text",
+          "localized": true,
+          "default": "Back to the shop",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "type": "field_group",
+      "label": "Category",
+      "fields": [
+        {
+          "id": "category_eyebrow",
+          "label": "Eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "Category",
+          "fallback": false
+        },
+        {
+          "id": "category_all_title",
+          "label": "Products title",
+          "type": "text",
+          "localized": true,
+          "default": "All items",
+          "fallback": false
+        },
+        {
+          "id": "category_count_one",
+          "label": "Count, singular",
+          "type": "text",
+          "localized": true,
+          "default": "style",
+          "description": "Follows the number of products, e.g. 1 style.",
+          "fallback": false
+        },
+        {
+          "id": "category_count_other",
+          "label": "Count, plural",
+          "type": "text",
+          "localized": true,
+          "default": "styles",
+          "description": "Follows the number of products, e.g. 12 styles.",
+          "fallback": false
+        },
+        {
+          "id": "category_empty_title",
+          "label": "Empty state title",
+          "type": "text",
+          "localized": true,
+          "default": "Nothing in this category yet",
+          "fallback": false
+        },
+        {
+          "id": "category_empty_body",
+          "label": "Empty state body",
+          "type": "long_text",
+          "localized": true,
+          "default": "Try another category, or browse everything in the shop.",
+          "fallback": false
+        },
+        {
+          "id": "category_empty_browse",
+          "label": "Empty state button",
+          "type": "text",
+          "localized": true,
+          "default": "Browse the shop",
+          "fallback": false
+        },
+        {
+          "id": "category_not_found_page_title",
+          "label": "Not found: browser tab title",
+          "type": "text",
+          "localized": true,
+          "default": "Not found",
+          "fallback": false
+        },
+        {
+          "id": "category_not_found_eyebrow",
+          "label": "Not found: eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "404",
+          "fallback": false
+        },
+        {
+          "id": "category_not_found_title",
+          "label": "Not found: title",
+          "type": "text",
+          "localized": true,
+          "default": "Category not found",
+          "fallback": false
+        },
+        {
+          "id": "category_not_found_body",
+          "label": "Not found: body",
+          "type": "long_text",
+          "localized": true,
+          "default": "This category may have been renamed or removed.",
+          "fallback": false
+        },
+        {
+          "id": "category_not_found_back",
+          "label": "Not found: back button",
+          "type": "text",
+          "localized": true,
+          "default": "Back to the shop",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "type": "field_group",
+      "label": "Cart",
+      "fields": [
+        {
+          "id": "cart_title",
+          "label": "Title",
+          "type": "text",
+          "localized": true,
+          "default": "Cart",
+          "description": "Also the browser tab title.",
+          "fallback": false
+        },
+        {
+          "id": "cart_start_over",
+          "label": "Start over button",
+          "type": "text",
+          "localized": true,
+          "default": "Empty the cart and start over",
+          "description": "Offered when the cart refuses a change, which happens when a product it holds has changed since.",
+          "fallback": false
+        },
+        {
+          "id": "cart_count_one",
+          "label": "Count, singular",
+          "type": "text",
+          "localized": true,
+          "default": "item",
+          "description": "Follows the number of items, e.g. 1 item.",
+          "fallback": false
+        },
+        {
+          "id": "cart_count_other",
+          "label": "Count, plural",
+          "type": "text",
+          "localized": true,
+          "default": "items",
+          "description": "Follows the number of items, e.g. 3 items.",
+          "fallback": false
+        },
+        {
+          "id": "cart_empty_eyebrow",
+          "label": "Empty eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "Empty",
+          "fallback": false
+        },
+        {
+          "id": "cart_empty_title",
+          "label": "Empty state title",
+          "type": "text",
+          "localized": true,
+          "default": "Your cart is empty",
+          "fallback": false
+        },
+        {
+          "id": "cart_empty_body",
+          "label": "Empty state body",
+          "type": "long_text",
+          "localized": true,
+          "default": "Nothing added yet. Everything is printed to order once you check out.",
+          "fallback": false
+        },
+        {
+          "id": "cart_empty_browse",
+          "label": "Empty state button",
+          "type": "text",
+          "localized": true,
+          "default": "Browse the shop",
+          "fallback": false
+        },
+        {
+          "id": "cart_each",
+          "label": "Unit price suffix",
+          "type": "text",
+          "localized": true,
+          "default": "each",
+          "description": "Follows the unit price on a line, e.g. $20.00 each.",
+          "fallback": false
+        },
+        {
+          "id": "cart_qty_label",
+          "label": "Quantity label",
+          "type": "text",
+          "localized": true,
+          "default": "Qty",
+          "fallback": false
+        },
+        {
+          "id": "cart_update",
+          "label": "Update button",
+          "type": "text",
+          "localized": true,
+          "default": "Update",
+          "fallback": false
+        },
+        {
+          "id": "cart_remove",
+          "label": "Remove button",
+          "type": "text",
+          "localized": true,
+          "default": "Remove",
+          "fallback": false
+        },
+        {
+          "id": "cart_summary_title",
+          "label": "Summary title",
+          "type": "text",
+          "localized": true,
+          "default": "Summary",
+          "fallback": false
+        },
+        {
+          "id": "cart_subtotal",
+          "label": "Subtotal label",
+          "type": "text",
+          "localized": true,
+          "default": "Subtotal",
+          "fallback": false
+        },
+        {
+          "id": "cart_discounts",
+          "label": "Discounts label",
+          "type": "text",
+          "localized": true,
+          "default": "Discounts",
+          "fallback": false
+        },
+        {
+          "id": "cart_checkout",
+          "label": "Checkout button",
+          "type": "text",
+          "localized": true,
+          "default": "Checkout",
+          "fallback": false
+        },
+        {
+          "id": "cart_summary_note",
+          "label": "Summary note",
+          "type": "long_text",
+          "localized": true,
+          "default": "Shipping and taxes are calculated at checkout.",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "type": "field_group",
+      "label": "Checkout",
+      "fields": [
+        {
+          "id": "checkout_eyebrow",
+          "label": "Eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "Step 1 of 2",
+          "fallback": false
+        },
+        {
+          "id": "checkout_title",
+          "label": "Title",
+          "type": "text",
+          "localized": true,
+          "default": "Checkout",
+          "description": "Also the browser tab title.",
+          "fallback": false
+        },
+        {
+          "id": "checkout_shipping_title",
+          "label": "Shipping title",
+          "type": "text",
+          "localized": true,
+          "default": "Shipping",
+          "fallback": false
+        },
+        {
+          "id": "checkout_selected",
+          "label": "Selected service marker",
+          "type": "text",
+          "localized": true,
+          "default": "selected",
+          "description": "Follows the name of the chosen shipping service.",
+          "fallback": false
+        },
+        {
+          "id": "checkout_no_services",
+          "label": "No shipping options yet",
+          "type": "long_text",
+          "localized": true,
+          "default": "Shipping options appear once you enter a delivery address on the next step.",
+          "fallback": false
+        },
+        {
+          "id": "checkout_order_title",
+          "label": "Order title",
+          "type": "text",
+          "localized": true,
+          "default": "Order",
+          "fallback": false
+        },
+        {
+          "id": "checkout_quantity",
+          "label": "Quantity prefix",
+          "type": "text",
+          "localized": true,
+          "default": "Quantity",
+          "description": "Precedes the number on each line, e.g. Quantity 2.",
+          "fallback": false
+        },
+        {
+          "id": "checkout_summary_title",
+          "label": "Summary title",
+          "type": "text",
+          "localized": true,
+          "default": "Summary",
+          "fallback": false
+        },
+        {
+          "id": "checkout_subtotal",
+          "label": "Subtotal label",
+          "type": "text",
+          "localized": true,
+          "default": "Subtotal",
+          "fallback": false
+        },
+        {
+          "id": "checkout_shipping",
+          "label": "Shipping label",
+          "type": "text",
+          "localized": true,
+          "default": "Shipping",
+          "fallback": false
+        },
+        {
+          "id": "checkout_tax",
+          "label": "Tax label",
+          "type": "text",
+          "localized": true,
+          "default": "Tax",
+          "fallback": false
+        },
+        {
+          "id": "checkout_total",
+          "label": "Total label",
+          "type": "text",
+          "localized": true,
+          "default": "Total",
+          "fallback": false
+        },
+        {
+          "id": "checkout_continue",
+          "label": "Continue button",
+          "type": "text",
+          "localized": true,
+          "default": "Continue to payment",
+          "fallback": false
+        },
+        {
+          "id": "checkout_unavailable",
+          "label": "Checkout unavailable",
+          "type": "long_text",
+          "localized": true,
+          "default": "Checkout is not available for this cart right now.",
+          "fallback": false
+        },
+        {
+          "id": "checkout_back_to_cart",
+          "label": "Back to cart link",
+          "type": "text",
+          "localized": true,
+          "default": "Back to the cart",
+          "fallback": false
+        },
+        {
+          "id": "checkout_payment_note",
+          "label": "Payment note",
+          "type": "long_text",
+          "localized": true,
+          "default": "Payment and delivery details are collected on the secure checkout.",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "type": "field_group",
+      "label": "Account",
+      "fields": [
+        {
+          "id": "account_title",
+          "label": "Account: title",
+          "type": "text",
+          "localized": true,
+          "default": "Account",
+          "description": "Also the browser tab title, and the heading when the account has no name.",
+          "fallback": false
+        },
+        {
+          "id": "account_signed_in",
+          "label": "Account: eyebrow fallback",
+          "type": "text",
+          "localized": true,
+          "default": "Signed in",
+          "description": "Shown when the account has no email address.",
+          "fallback": false
+        },
+        {
+          "id": "account_nav_label",
+          "label": "Account: navigation name",
+          "type": "text",
+          "localized": true,
+          "default": "Account",
+          "description": "Screen-reader name of the account links.",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_link",
+          "label": "Account: orders link",
+          "type": "text",
+          "localized": true,
+          "default": "Orders",
+          "fallback": false
+        },
+        {
+          "id": "account_shop_link",
+          "label": "Account: shop link",
+          "type": "text",
+          "localized": true,
+          "default": "Shop",
+          "fallback": false
+        },
+        {
+          "id": "account_logout_link",
+          "label": "Account: log out link",
+          "type": "text",
+          "localized": true,
+          "default": "Log out",
+          "fallback": false
+        },
+        {
+          "id": "account_login_eyebrow",
+          "label": "Log in: eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "Account",
+          "fallback": false
+        },
+        {
+          "id": "account_login_title",
+          "label": "Log in: title",
+          "type": "text",
+          "localized": true,
+          "default": "Log in",
+          "description": "Also the browser tab title.",
+          "fallback": false
+        },
+        {
+          "id": "account_login_email",
+          "label": "Log in: email label",
+          "type": "text",
+          "localized": true,
+          "default": "Email",
+          "fallback": false
+        },
+        {
+          "id": "account_login_password",
+          "label": "Log in: password label",
+          "type": "text",
+          "localized": true,
+          "default": "Password",
+          "fallback": false
+        },
+        {
+          "id": "account_login_submit",
+          "label": "Log in: submit button",
+          "type": "text",
+          "localized": true,
+          "default": "Log in",
+          "fallback": false
+        },
+        {
+          "id": "account_login_signup_link",
+          "label": "Log in: create account link",
+          "type": "text",
+          "localized": true,
+          "default": "Create an account",
+          "fallback": false
+        },
+        {
+          "id": "account_login_recover_link",
+          "label": "Log in: forgot password link",
+          "type": "text",
+          "localized": true,
+          "default": "Forgot your password?",
+          "fallback": false
+        },
+        {
+          "id": "account_login_error",
+          "label": "Log in: error",
+          "type": "long_text",
+          "localized": true,
+          "default": "That email and password did not match an account.",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_eyebrow",
+          "label": "Sign up: eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "Account",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_title",
+          "label": "Sign up: title",
+          "type": "text",
+          "localized": true,
+          "default": "Create an account",
+          "description": "Also the browser tab title.",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_first_name",
+          "label": "Sign up: first name label",
+          "type": "text",
+          "localized": true,
+          "default": "First name",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_last_name",
+          "label": "Sign up: last name label",
+          "type": "text",
+          "localized": true,
+          "default": "Last name",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_email",
+          "label": "Sign up: email label",
+          "type": "text",
+          "localized": true,
+          "default": "Email",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_password",
+          "label": "Sign up: password label",
+          "type": "text",
+          "localized": true,
+          "default": "Password",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_submit",
+          "label": "Sign up: submit button",
+          "type": "text",
+          "localized": true,
+          "default": "Create account",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_login_link",
+          "label": "Sign up: log in link",
+          "type": "text",
+          "localized": true,
+          "default": "Already have an account?",
+          "fallback": false
+        },
+        {
+          "id": "account_signup_error",
+          "label": "Sign up: error",
+          "type": "long_text",
+          "localized": true,
+          "default": "That account could not be created. The email may already be in use.",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_eyebrow",
+          "label": "Reset password: eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "Account",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_title",
+          "label": "Reset password: title",
+          "type": "text",
+          "localized": true,
+          "default": "Reset your password",
+          "description": "Also the browser tab title.",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_email",
+          "label": "Reset password: email label",
+          "type": "text",
+          "localized": true,
+          "default": "Email",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_send_submit",
+          "label": "Reset password: send button",
+          "type": "text",
+          "localized": true,
+          "default": "Send reset link",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_new_password",
+          "label": "Reset password: new password label",
+          "type": "text",
+          "localized": true,
+          "default": "New password",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_set_submit",
+          "label": "Reset password: set button",
+          "type": "text",
+          "localized": true,
+          "default": "Set new password",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_sent",
+          "label": "Reset password: link sent",
+          "type": "long_text",
+          "localized": true,
+          "default": "If that email has an account, a reset link is on its way. The link expires, so use it soon.",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_done",
+          "label": "Reset password: done",
+          "type": "text",
+          "localized": true,
+          "default": "Your password has been changed.",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_login",
+          "label": "Reset password: log in button",
+          "type": "text",
+          "localized": true,
+          "default": "Log in",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_error",
+          "label": "Reset password: expired link",
+          "type": "long_text",
+          "localized": true,
+          "default": "That reset link has expired. Request a new one below.",
+          "fallback": false
+        },
+        {
+          "id": "account_recover_back",
+          "label": "Reset password: back link",
+          "type": "text",
+          "localized": true,
+          "default": "Back to log in",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_eyebrow",
+          "label": "Orders: eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "Account",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_title",
+          "label": "Orders: title",
+          "type": "text",
+          "localized": true,
+          "default": "Orders",
+          "description": "Also the browser tab title.",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_empty_title",
+          "label": "Orders: empty state title",
+          "type": "text",
+          "localized": true,
+          "default": "No orders yet",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_empty_body",
+          "label": "Orders: empty state body",
+          "type": "long_text",
+          "localized": true,
+          "default": "Orders you place appear here, with tracking once they ship.",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_empty_browse",
+          "label": "Orders: empty state button",
+          "type": "text",
+          "localized": true,
+          "default": "Browse the shop",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_shipment",
+          "label": "Orders: shipment fallback",
+          "type": "text",
+          "localized": true,
+          "default": "Shipment",
+          "description": "Shown when a shipment has no carrier name.",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_tracking",
+          "label": "Orders: tracking prefix",
+          "type": "text",
+          "localized": true,
+          "default": "Tracking",
+          "description": "Precedes the tracking number.",
+          "fallback": false
+        },
+        {
+          "id": "account_orders_back",
+          "label": "Orders: back link",
+          "type": "text",
+          "localized": true,
+          "default": "Back to account",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "type": "field_group",
+      "label": "Not found",
+      "fields": [
+        {
+          "id": "not_found_eyebrow",
+          "label": "Eyebrow",
+          "type": "text",
+          "localized": true,
+          "default": "404",
+          "fallback": false
+        },
+        {
+          "id": "not_found_title",
+          "label": "Title",
+          "type": "text",
+          "localized": true,
+          "default": "Page not found",
+          "description": "Also the browser tab title.",
+          "fallback": false
+        },
+        {
+          "id": "not_found_body",
+          "label": "Body",
+          "type": "long_text",
+          "localized": true,
+          "default": "The page you were looking for is not here. It may have moved.",
+          "fallback": false
+        },
+        {
+          "id": "not_found_back",
+          "label": "Back button",
+          "type": "text",
+          "localized": true,
+          "default": "Back to the shop",
+          "fallback": false
+        }
+      ]
+    }
+  ]
+}

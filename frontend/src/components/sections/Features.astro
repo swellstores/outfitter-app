@@ -1,0 +1,42 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * Up to four short points side by side, each a title and a line. A point
+ * with neither is left out of a shopper's page; in edit mode it stays, empty,
+ * so copy typed into the editor's rail shows up without a reload.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+
+const slots = (['a', 'b', 'c', 'd'] as const).map((slot) => ({
+  title: `title_${slot}` as const,
+  text: `text_${slot}` as const,
+}));
+---
+
+<section class="sec sec--features" data-section={section.id} data-section-type="features">
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+  </div>
+
+  <ul class="sec__grid sec__grid--four">
+    {slots.map(
+      ({ title, text }) =>
+        (section[title] || section[text] || editMode) && (
+          <li class="sec__item">
+            <h3 class="sec__item-title"><T id={`sec:${section.id}:${title}`} value={section[title]} /></h3>
+            <p class="sec__item-text"><T id={`sec:${section.id}:${text}`} value={section[text]} /></p>
+          </li>
+        ),
+    )}
+  </ul>
+</section>

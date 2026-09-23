@@ -1,0 +1,170 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import Layout from '@/layouts/Layout.astro';
+import T from '@/components/T.astro';
+import { formatMoney } from '@/lib/format';
+
+const { swell, cart, t } = Astro.locals;
+const { currency, locale } = swell.getStorefrontLocalization();
+
+const items: SwellData[] = cart?.items ?? [];
+const count = Number(cart?.item_quantity) || 0;
+const discount = Number(cart?.discount_total) || 0;
+
+/** See the same function in lib/cart-json.ts, which the drawer uses. */
+function optionsOf(item: SwellData): string {
+  const options: SwellData[] = item.options ?? [];
+
+  return options
+    .filter((option: SwellData) => option?.value)
+    .map((option: SwellData) =>
+      option.variant || !option.name
+        ? String(option.value)
+        : `${option.name}: ${option.value}`,
+    )
+    .join(' · ');
+}
+
+// Set by the cart handler when a write was refused, so the page can say so
+// instead of looking as though nothing happened. A flag, not a message: a
+// reflected one would let a crafted link show a shopper any wording at all.
+const failed = Astro.url.searchParams.has('cart_error');
+---
+
+<Layout title={t('cart_title')}>
+  <div class="container">
+    <header class="page-head">
+      <p class="eyebrow">
+        {count > 0 ? <>{count} {count === 1 ? <T id="cart_count_one" /> : <T id="cart_count_other" />}</> : <T id="cart_empty_eyebrow" />}
+      </p>
+      <h1 class="display"><T id="cart_title" /></h1>
+    </header>
+
+    {
+      failed && (
+        <div class="notice-error">
+          <p class="error"><T id="global_drawer_error" /></p>
+          {/* The only move that always works: a cart holding a line the
+              catalog now refuses cannot be emptied one line at a time. */}
+          <form method="post" action="/cart">
+            <input type="hidden" name="action" value="empty" />
+            <input type="hidden" name="redirect_to" value="/cart" />
+            <button class="linkbtn" type="submit"><T id="cart_start_over" /></button>
+          </form>
+        </div>
+      )
+    }
+
+    {
+      items.length === 0 ? (
+        <div class="empty">
+          <h2 class="subtitle"><T id="cart_empty_title" /></h2>
+          <p class="lede">
+            <T id="cart_empty_body" />
+          </p>
+          <a class="btn" href="/">
+            <T id="cart_empty_browse" />
+          </a>
+        </div>
+      ) : (
+        <div class="split">
+          <ul class="lines">
+            {items.map((item: SwellData) => (
+              <li class="line">
+                <div class="line__media">
+                  {item.product?.images?.[0]?.file?.url && (
+                    <img
+                      src={item.product.images[0].file.url}
+                      alt={item.product?.name}
+                      loading="lazy"
+                    />
+                  )}
+                </div>
+
+                <div class="line__body">
+                  <h2 class="line__name">
+                    <a
+                      href={`/products/${item.product?.slug || item.product_id}`}
+                    >
+                      {item.product_name || item.product?.name}
+                    </a>
+                  </h2>
+
+                  <p class="line__opts">
+                    {(optionsOf(item) || item.variant?.name) && (
+                      <>{optionsOf(item) || item.variant?.name}{' · '}</>
+                    )}
+                    {formatMoney(item.price, currency, locale)} <T id="cart_each" />
+                  </p>
+
+                  <div class="line__actions">
+                    <form method="post" action="/cart">
+                      <input type="hidden" name="action" value="update" />
+                      <input type="hidden" name="item_id" value={item.id} />
+                      <input type="hidden" name="redirect_to" value="/cart" />
+                      <div>
+                        <label class="field__label" for={`qty-${item.id}`}>
+                          <T id="cart_qty_label" />
+                        </label>
+                        <input
+                          class="line__qty"
+                          id={`qty-${item.id}`}
+                          type="number"
+                          name="quantity"
+                          value={item.quantity}
+                          min="0"
+                          step="1"
+                        />
+                      </div>
+                      <button class="btn btn--small" type="submit">
+                        <T id="cart_update" />
+                      </button>
+                    </form>
+
+                    <form method="post" action="/cart">
+                      <input type="hidden" name="action" value="remove" />
+                      <input type="hidden" name="item_id" value={item.id} />
+                      <input type="hidden" name="redirect_to" value="/cart" />
+                      <button class="linkbtn" type="submit">
+                        <T id="cart_remove" />
+                      </button>
+                    </form>
+                  </div>
+                </div>
+
+                <div class="line__total">
+                  {formatMoney(item.price_total, currency, locale)}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <aside class="summary">
+            <h2 class="section__title"><T id="cart_summary_title" /></h2>
+
+            <div class="summary__row">
+              <span><T id="cart_subtotal" /></span>
+              <span>{formatMoney(cart?.sub_total, currency, locale)}</span>
+            </div>
+
+            {discount > 0 && (
+              <div class="summary__row">
+                <span><T id="cart_discounts" /></span>
+                <span>-{formatMoney(discount, currency, locale)}</span>
+              </div>
+            )}
+
+            <a class="btn btn--primary btn--block" href="/checkout">
+              <T id="cart_checkout" />
+            </a>
+
+            <p class="summary__note">
+              <T id="cart_summary_note" />
+            </p>
+          </aside>
+        </div>
+      )
+    }
+  </div>
+</Layout>

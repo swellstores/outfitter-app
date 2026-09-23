@@ -1,0 +1,29 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import T from '@/components/T.astro';
+
+// The account middleware gates every /account path except login, signup and
+// recover, so by the time this renders there is an account.
+const { account, t } = Astro.locals;
+
+const name = [account?.first_name, account?.last_name].filter(Boolean).join(' ');
+---
+
+<Layout title={t('account_title')}>
+  <div class="container">
+    <header class="page-head">
+      <p class="eyebrow">
+        {account?.email ? account.email : <T id="account_signed_in" />}
+      </p>
+      <h1 class="display">{name ? name : <T id="account_title" />}</h1>
+    </header>
+
+    <nav aria-label={t('account_nav_label')}>
+      <ul class="linklist">
+        <li><a href="/account/orders"><T id="account_orders_link" /></a></li>
+        <li><a href="/"><T id="account_shop_link" /></a></li>
+        <li><a href="/account/logout"><T id="account_logout_link" /></a></li>
+      </ul>
+    </nav>
+  </div>
+</Layout>

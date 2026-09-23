@@ -1,0 +1,111 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import T from '@/components/T.astro';
+
+const { swell, t } = Astro.locals;
+
+// Swell puts the key it generates into the reset_url in place of {reset_key},
+// and the link comes back to this same page to set the new password.
+const resetKey = Astro.url.searchParams.get('key') || '';
+
+// The id of the error to show, so the sentence itself is editable copy.
+let error = '';
+let sent = false;
+let reset = false;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+
+  if (resetKey) {
+    const updated = await swell.storefront.account
+      .recover({
+        password_reset_key: resetKey,
+        password: String(form.get('password') ?? ''),
+      })
+      .catch(() => null);
+
+    if (updated && !('errors' in updated)) {
+      reset = true;
+    } else {
+      error = 'account_recover_error';
+    }
+  } else {
+    await swell.storefront.account
+      .recover({
+        email: String(form.get('email') ?? ''),
+        reset_url: `${Astro.url.origin}/account/recover?key={reset_key}`,
+      })
+      .catch(() => null);
+
+    // Always the same answer, so this page cannot be used to test whether an
+    // address has an account.
+    sent = true;
+  }
+}
+---
+
+<Layout title={t('account_recover_title')}>
+  <div class="container">
+    <header class="page-head">
+      <p class="eyebrow"><T id="account_recover_eyebrow" /></p>
+      <h1 class="display"><T id="account_recover_title" /></h1>
+    </header>
+
+    <div class="narrow">
+      {error && <p class="error"><T id={error} /></p>}
+
+      {
+        reset ? (
+          <div class="stack">
+            <p class="lede"><T id="account_recover_done" /></p>
+            <a class="btn" href="/account/login">
+              <T id="account_recover_login" />
+            </a>
+          </div>
+        ) : sent ? (
+          <p class="lede">
+            <T id="account_recover_sent" />
+          </p>
+        ) : resetKey && !error ? (
+          <form method="post">
+            <label class="field">
+              <span class="field__label"><T id="account_recover_new_password" /></span>
+              <input
+                class="input"
+                type="password"
+                name="password"
+                autocomplete="new-password"
+                required
+              />
+            </label>
+
+            <button class="btn btn--primary btn--block" type="submit">
+              <T id="account_recover_set_submit" />
+            </button>
+          </form>
+        ) : (
+          <form method="post">
+            <label class="field">
+              <span class="field__label"><T id="account_recover_email" /></span>
+              <input
+                class="input"
+                type="email"
+                name="email"
+                autocomplete="email"
+                required
+              />
+            </label>
+
+            <button class="btn btn--primary btn--block" type="submit">
+              <T id="account_recover_send_submit" />
+            </button>
+          </form>
+        )
+      }
+
+      <p class="form-links">
+        <a href="/account/login"><T id="account_recover_back" /></a>
+      </p>
+    </div>
+  </div>
+</Layout>

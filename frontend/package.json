@@ -1,0 +1,23 @@
+{
+  "name": "frontend",
+  "type": "module",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.6.9",
+    "@swell/apps-sdk": "^1.0.132",
+    "astro": "^5.13.10"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.42.0"
+  }
+}

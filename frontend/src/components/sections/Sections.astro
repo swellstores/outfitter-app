@@ -1,0 +1,120 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import { tenantKey } from '@/swell';
+import { getAppSettings } from '@/lib/app-settings';
+import {
+  getSections,
+  sectionStyle,
+  type AnchorSectionType,
+  type MarketingSectionType,
+  type SectionPage,
+} from '@/lib/sections';
+import Announcement from './Announcement.astro';
+import Categories from './Categories.astro';
+import CategoryProducts from './CategoryProducts.astro';
+import Cta from './Cta.astro';
+import Faq from './Faq.astro';
+import Features from './Features.astro';
+import Hero from './Hero.astro';
+import ImageBanner from './ImageBanner.astro';
+import ImageText from './ImageText.astro';
+import Logos from './Logos.astro';
+import ProductRow from './ProductRow.astro';
+import Products from './Products.astro';
+import ProductSpotlight from './ProductSpotlight.astro';
+import ProductDetail from './ProductDetail.astro';
+import Prose from './Prose.astro';
+import Stats from './Stats.astro';
+import Steps from './Steps.astro';
+import Testimonials from './Testimonials.astro';
+import Text from './Text.astro';
+
+/**
+ * A page's sections, in the merchant's order, each resolved for the locale the
+ * page is rendered in. On the home page with nothing saved this is the hero and
+ * the product grid — the page as it was before sections.
+ *
+ * The page is a prop rather than something inferred from the URL: the editor
+ * saves what the preview says it is showing, and a guess from the pathname is
+ * how one page's list gets written under another page's key.
+ *
+ * `record` is what the page is about — the product on a product page. Only the
+ * anchor section reads it; a page whose sections are all marketing has none.
+ */
+interface Props {
+  page: SectionPage;
+  record?: SwellData;
+}
+
+const { page, record } = Astro.props;
+const { swell, editLocale } = Astro.locals;
+const app = await getAppSettings(swell, tenantKey(Astro));
+// A hidden section is left off the page entirely, in edit mode too: the
+// editor keeps it in its list, with its eye toggle, so it can be shown again.
+const sections = getSections(app, page, editLocale).filter((section) => !section.hidden);
+
+// Two maps, because the two kinds take different props: a marketing section
+// is its own content, an anchor renders the page's record.
+const marketing: Record<MarketingSectionType, typeof Hero> = {
+  hero: Hero,
+  text: Text,
+  image_text: ImageText,
+  cta: Cta,
+  products: Products,
+  announcement: Announcement,
+  prose: Prose,
+  features: Features,
+  steps: Steps,
+  stats: Stats,
+  testimonials: Testimonials,
+  faq: Faq,
+  logos: Logos,
+  image_banner: ImageBanner,
+  categories: Categories,
+  product_spotlight: ProductSpotlight,
+  product_row: ProductRow,
+};
+
+const anchors: Record<AnchorSectionType, typeof ProductDetail> = {
+  product_detail: ProductDetail,
+  category_products: CategoryProducts,
+};
+---
+
+{/* What page this is, for the editor: reported rather than inferred from the
+    URL, and hidden so it is never a box on the page. Before the style block,
+    which keeps `.container > .sec:last-child` matching the last section. */}
+<div hidden data-sections-page={page}></div>
+
+{
+  /* Whatever any section's appearance settings differ from its type's
+     defaults, as custom properties the rules in layouts/Layout.astro read.
+     A store that has changed nothing emits nothing at all. Before the
+     sections, so `.container > .sec:last-child` still matches the last one. */
+  (() => {
+    const css = sections
+      .map((section) => {
+        const body = sectionStyle(section);
+        return body ? `[data-section="${section.id}"]{${body}}` : '';
+      })
+      .filter(Boolean)
+      .join('');
+
+    return css ? <style is:inline set:html={css} /> : null;
+  })()
+}
+{
+  sections.map((section) => {
+    const Anchor = anchors[section.type as AnchorSectionType];
+
+    if (Anchor) {
+      // No record means the page has nothing to show — it is a 404, and does
+      // not render its sections at all — so this is the type checker's branch.
+      return record ? <Anchor section={section} record={record} /> : null;
+    }
+
+    const Component = marketing[section.type as MarketingSectionType];
+    return <Component section={section} />;
+  })
+}

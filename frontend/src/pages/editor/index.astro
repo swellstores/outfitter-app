@@ -1,0 +1,3696 @@
+---
+import { SETTINGS_TABS, isEditorMode } from '@/lib/editor';
+
+/**
+ * The editor shell: pages and the current page's sections on the left, the
+ * page itself in the middle at a chosen preview width, store settings in a
+ * dialog opened from the top bar. Copy is edited in the page. A full-screen
+ * app of its own — none of the storefront's chrome — drawn with the
+ * storefront's tokens so it reads as part of the product.
+ *
+ * The middleware already rewrites this path to a 404 outside editor and
+ * preview requests; checking again here costs nothing. The key itself is
+ * asked for here and checked by the API, so the shell needs only the mode.
+ */
+if (!isEditorMode(Astro.locals.swell)) {
+  return new Response(null, { status: 404 });
+}
+
+Astro.response.headers.set('cache-control', 'no-store, private');
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Editor — Outfitter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+  </head>
+
+  <body>
+    <div class="ed" id="editor">
+      <aside class="ed__nav" aria-label="Editor">
+        <div class="ed__brand">
+          <span class="ed__mark">Outfitter</span>
+          <span class="ed__muted">Editor</span>
+        </div>
+
+        <nav class="ed__pages" id="pages-view" aria-label="Pages" hidden>
+          <h2 class="ed__heading">Pages</h2>
+          <ul class="ed__list" id="pages"></ul>
+        </nav>
+
+        <section class="ed__panel" id="page-view" aria-labelledby="panel-title">
+          <div class="ed__panel-head">
+            <button class="ed__back" type="button" id="back" aria-label="Back to pages" disabled>‹ Pages</button>
+            <h2 class="ed__panel-title" id="panel-title" tabindex="-1">Loading…</h2>
+          </div>
+
+          <section id="sections" aria-labelledby="sections-heading" hidden>
+            <div class="ed__heading-row">
+              <h2 class="ed__heading" id="sections-heading">Sections</h2>
+              <button
+                class="ed__info"
+                type="button"
+                id="sections-info"
+                aria-expanded="false"
+                aria-controls="sections-help"
+                aria-describedby="sections-help"
+                aria-label="How sections work">i</button>
+            </div>
+            <p class="ed__note">Top to bottom. Drag a row to reorder.</p>
+            <div class="ed__help" id="sections-help" role="note" hidden>
+              Drag a row by its ⠇ handle, or press Alt + ↑ / ↓ with a row focused. In the preview,
+              drag a section by its corner label, or click a blank part of it to open its settings.
+              The eye keeps a section off the page — it stays in this list until you show it again.
+              The × deletes it, after asking. The Product page has one list, shown on every product,
+              and the Category page one shown on every category; the preview is showing a sample.
+              On those two pages one row is what the page is for — Product detail, Category products
+              — so its eye and × are dimmed: it cannot be hidden or deleted. It drags like any other
+              row and has nothing of its own to set. Click your own copy in the preview — headings,
+              labels, a section's text — to edit it in place; product names, prices and descriptions
+              come from the store and do not open here.
+            </div>
+            <span class="ed__sr" id="sections-status" role="status" aria-live="polite"></span>
+            <ol class="ed-seclist" id="section-list"></ol>
+            <button class="ed-btn ed-btn--small" type="button" id="section-add" aria-expanded="false">
+              + Add section
+            </button>
+            <div class="ed-picker" id="section-picker" role="group" aria-label="Section types" hidden></div>
+          </section>
+
+          <div class="ed__empty" id="no-sections" hidden>
+            <span class="ed__empty-title">No sections on this page</span>
+            Edit its text directly on the page: click any line in the preview. The header,
+            footer and drawer work the same way on every page. Store-wide options are under Settings.
+          </div>
+        </section>
+      </aside>
+
+      <div class="ed__stage">
+        <header class="ed__bar">
+          <div class="ed__lead">
+            <h1 class="ed__page" id="page-name">Loading…</h1>
+            <span class="ed__status" id="status" role="status" aria-live="polite"></span>
+          </div>
+
+          <div class="ed__widths" role="group" aria-label="Preview width">
+            <button class="ed__width" type="button" data-width="desktop" aria-pressed="true">Desktop</button>
+            <button class="ed__width" type="button" data-width="tablet" aria-pressed="false">Tablet</button>
+            <button class="ed__width" type="button" data-width="mobile" aria-pressed="false">Mobile</button>
+          </div>
+
+          <div class="ed__tools">
+            <button
+              class="ed-btn ed-btn--small"
+              type="button"
+              id="settings-open"
+              aria-haspopup="dialog"
+              aria-controls="settings-dialog"
+              disabled
+            >
+              Settings
+            </button>
+            <button class="ed-btn ed-btn--small" type="button" id="reload">
+              Reload
+            </button>
+            <a class="ed-btn ed-btn--small" id="open" href="/" target="_blank" rel="noopener">
+              Open page ↗
+            </a>
+          </div>
+        </header>
+
+        <div class="ed__canvas" id="canvas" data-width="desktop">
+          <iframe class="ed__frame" id="frame" title="Page being edited"></iframe>
+        </div>
+      </div>
+
+      <aside class="ed__rail" id="rail" aria-labelledby="rail-heading" hidden>
+        <div class="ed__rail-head">
+          <h2 class="ed__heading" id="rail-heading" tabindex="-1">Section settings</h2>
+          <button class="ed__rail-close" type="button" id="rail-close" aria-label="Close settings">×</button>
+        </div>
+        <p class="ed__note" id="rail-name"></p>
+        <div id="rail-fields"></div>
+      </aside>
+    </div>
+
+    <dialog class="ed-modal" id="settings-dialog" aria-labelledby="settings-heading" closedby="none">
+      <form class="ed-modal__form" id="settings-form" novalidate>
+        <div class="ed-modal__head">
+          <h2 class="ed__heading" id="settings-heading">Settings</h2>
+          <button class="ed-modal__close" type="button" id="settings-close" aria-label="Close">×</button>
+        </div>
+        <div class="ed-tabs" role="tablist" aria-label="Settings" id="settings-tabs">
+          {
+            SETTINGS_TABS.map((tab, i) => (
+              <button
+                class="ed-tab"
+                type="button"
+                role="tab"
+                id={`settings-tab-${tab.id}`}
+                data-tab={tab.id}
+                aria-controls={`settings-panel-${tab.id}`}
+                aria-selected={i === 0 ? 'true' : 'false'}
+                tabindex={i === 0 ? 0 : -1}
+              >
+                {tab.label}
+              </button>
+            ))
+          }
+        </div>
+        <div class="ed-modal__body">
+          {
+            SETTINGS_TABS.map((tab, i) => (
+              <div
+                class="ed-tabpanel"
+                role="tabpanel"
+                id={`settings-panel-${tab.id}`}
+                data-panel={tab.id}
+                aria-labelledby={`settings-tab-${tab.id}`}
+                hidden={i > 0}
+              />
+            ))
+          }
+        </div>
+        <div class="ed-modal__foot">
+          <span class="ed__dirty" id="settings-dirty" hidden>Unsaved changes</span>
+          <p class="ed-modal__error" id="settings-error" role="alert"></p>
+          <button class="ed-btn ed-btn--small" type="button" id="settings-cancel">Cancel</button>
+          <button class="ed-btn ed-btn--small ed-btn--primary" type="submit" id="settings-save">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="ed-modal ed-modal--confirm" id="delete-dialog" aria-labelledby="delete-heading" aria-describedby="delete-text" closedby="none">
+      <form class="ed-modal__form" id="delete-form" novalidate>
+        <div class="ed-modal__head">
+          <h2 class="ed__heading" id="delete-heading">Delete section</h2>
+          <button class="ed-modal__close" type="button" id="delete-close" aria-label="Close">×</button>
+        </div>
+        <div class="ed-modal__body">
+          <p class="ed-modal__text" id="delete-text">Delete this section?</p>
+          <p class="ed__note" id="delete-note">
+            Its copy in every language goes with it. To keep it off the page without losing anything, hide it instead.
+          </p>
+        </div>
+        <div class="ed-modal__foot">
+          <button class="ed-btn ed-btn--small" type="button" id="delete-cancel">Cancel</button>
+          <button class="ed-btn ed-btn--small ed-btn--primary" type="submit" id="delete-confirm">Delete</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script>
+      import type { EditorPage, EditorState, SettingsField } from '@/lib/editor';
+      import type { SectionField, SectionTypeDef, StoredSection } from '@/lib/sections';
+
+      type Content = Record<string, unknown>;
+      type PreviewWidth = 'desktop' | 'tablet' | 'mobile';
+
+      const WIDTH_KEY = 'outfitter:editor:width';
+
+      /** A copy field of one home page section, or a content field. */
+      interface FieldSpec {
+        id: string;
+        label: string;
+        type: string;
+        options?: Array<{ value: string; label: string }>;
+      }
+
+      /** Where a copy field's value lives, and how. */
+      interface Target {
+        record: Content;
+        key: string;
+        /** Translated per locale under `$locale`; otherwise one value for all. */
+        localized: boolean;
+        /** What shows when nothing is stored. */
+        fallback: string;
+      }
+
+      const EDIT_MESSAGE = 'outfitter:edit';
+      const EDITED_MESSAGE = 'outfitter:edited';
+      const PAGE_MESSAGE = 'outfitter:page';
+      const SECTION_HOVER_MESSAGE = 'outfitter:section-hover';
+      const SECTION_MOVE_MESSAGE = 'outfitter:section-move';
+      const SECTION_HIDE_MESSAGE = 'outfitter:section-hide';
+      const SECTION_DELETE_MESSAGE = 'outfitter:section-delete';
+      const SECTION_SELECT_MESSAGE = 'outfitter:section-select';
+      const SECTION_SETTINGS_MESSAGE = 'outfitter:section-settings';
+      const SECTION_REVEAL_MESSAGE = 'outfitter:section-reveal';
+
+      /**
+       * Largest image the editor will upload, checked in the browser before a
+       * byte goes out. Mirrors MAX_UPLOAD_BYTES in lib/editor.ts, which is the
+       * one that matters; this script imports types only.
+       */
+      const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+      const EYE_ON =
+        '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8c1.8-3 4-4.5 6.5-4.5S12.7 5 14.5 8c-1.8 3-4 4.5-6.5 4.5S3.3 11 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>';
+      const EYE_OFF =
+        '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8c1.8-3 4-4.5 6.5-4.5S12.7 5 14.5 8c-1.8 3-4 4.5-6.5 4.5S3.3 11 1.5 8Z"/><circle cx="8" cy="8" r="2"/><path d="M2.5 2.5l11 11"/></svg>';
+
+      const origin = location.origin;
+
+      const pagesList = byId<HTMLUListElement>('pages');
+      const pagesView = byId<HTMLElement>('pages-view');
+      const pageView = byId<HTMLElement>('page-view');
+      const panelTitle = byId<HTMLHeadingElement>('panel-title');
+      const backButton = byId<HTMLButtonElement>('back');
+      const noSections = byId<HTMLDivElement>('no-sections');
+      const settingsDialog = byId<HTMLDialogElement>('settings-dialog');
+      const settingsOpen = byId<HTMLButtonElement>('settings-open');
+      const settingsClose = byId<HTMLButtonElement>('settings-close');
+      const settingsCancel = byId<HTMLButtonElement>('settings-cancel');
+      const settingsTabs = byId<HTMLDivElement>('settings-tabs');
+      const settingsPanels = Array.from(
+        document.querySelectorAll<HTMLDivElement>('[data-panel]'),
+      );
+      const settingsTabButtons = Array.from(
+        settingsTabs.querySelectorAll<HTMLButtonElement>('[data-tab]'),
+      );
+      const settingsForm = byId<HTMLFormElement>('settings-form');
+      const settingsSave = byId<HTMLButtonElement>('settings-save');
+      const settingsDirty = byId<HTMLSpanElement>('settings-dirty');
+      const settingsError = byId<HTMLParagraphElement>('settings-error');
+      const pageName = byId<HTMLHeadingElement>('page-name');
+      const statusEl = byId<HTMLSpanElement>('status');
+      const widthButtons = document.querySelectorAll<HTMLButtonElement>('.ed__width');
+      const reloadButton = byId<HTMLButtonElement>('reload');
+      const openLink = byId<HTMLAnchorElement>('open');
+      const canvas = byId<HTMLDivElement>('canvas');
+      const frame = byId<HTMLIFrameElement>('frame');
+      const sectionsPanel = byId<HTMLElement>('sections');
+      const sectionList = byId<HTMLOListElement>('section-list');
+      const sectionAdd = byId<HTMLButtonElement>('section-add');
+      const sectionPicker = byId<HTMLDivElement>('section-picker');
+      const sectionsInfo = byId<HTMLButtonElement>('sections-info');
+      const sectionsHelp = byId<HTMLDivElement>('sections-help');
+      const sectionsStatus = byId<HTMLSpanElement>('sections-status');
+      const editor = byId<HTMLDivElement>('editor');
+      const rail = byId<HTMLElement>('rail');
+      const railHeading = byId<HTMLHeadingElement>('rail-heading');
+      const railClose = byId<HTMLButtonElement>('rail-close');
+      const railName = byId<HTMLParagraphElement>('rail-name');
+      const railFields = byId<HTMLDivElement>('rail-fields');
+      const deleteDialog = byId<HTMLDialogElement>('delete-dialog');
+      const deleteForm = byId<HTMLFormElement>('delete-form');
+      const deleteText = byId<HTMLParagraphElement>('delete-text');
+      const deleteNote = byId<HTMLParagraphElement>('delete-note');
+      const deleteClose = byId<HTMLButtonElement>('delete-close');
+      const deleteCancel = byId<HTMLButtonElement>('delete-cancel');
+
+      let state: EditorState;
+      let page: EditorPage;
+      // `page` has no value until the first show(). Tracked separately so the
+      // paths that run before it — boot, and show's own first call — can ask
+      // without reading it.
+      let pageKnown = false;
+      // The locale the frame's page is rendered in — the storefront's own,
+      // chosen in its header. Known once the page reports it.
+      let locale = '';
+      // The path the frame last reported: what is actually shown, which after
+      // an in-frame link may be a page the nav has no entry for.
+      let shownPath = '';
+      // The section ids the frame's page shows, in order — as it reported them,
+      // or as it rearranged them by a drag. null while a load is in flight.
+      let shownSections: string[] | null = null;
+      let statusTimer = 0;
+
+      function byId<T extends HTMLElement>(id: string): T {
+        return document.getElementById(id) as T;
+      }
+
+      // ---- content resolution, mirroring lib/content.ts ----------------------
+
+      function record(value: unknown): Content | undefined {
+        return value && typeof value === 'object' && !Array.isArray(value)
+          ? (value as Content)
+          : undefined;
+      }
+
+      /** A stored value as text: a number reads as one, an image record as its URL. */
+      function text(value: unknown): string | undefined {
+        if (typeof value === 'number') {
+          return String(value);
+        }
+
+        if (typeof value === 'string') {
+          return value !== '' ? value : undefined;
+        }
+
+        const url = record(value)?.url;
+
+        return typeof url === 'string' && url !== '' ? url : undefined;
+      }
+
+      function typeFor(type: string): SectionTypeDef | undefined {
+        return state.sections.types.find((entry) => entry.type === type);
+      }
+
+      /** Splits `sec:<section>:<field>`; anything else is a content field id. */
+      function sectionRef(id: string): { item: StoredSection; field: string } | undefined {
+        const match = /^sec:([^:]+):([^:]+)$/.exec(id);
+        const item = match && listFor().find((entry) => entry.id === match[1]);
+
+        return item && match ? { item, field: match[2] } : undefined;
+      }
+
+      function targetOf(id: string): Target | undefined {
+        const ref = sectionRef(id);
+
+        if (ref) {
+          const field = typeFor(ref.item.type)?.fields.find((entry) => entry.id === ref.field);
+
+          return field
+            ? { record: ref.item as Content, key: ref.field, localized: field.localized, fallback: '' }
+            : undefined;
+        }
+
+        const field = state.content.fields[id];
+
+        return field
+          ? { record: state.content.values, key: id, localized: true, fallback: field.default }
+          : undefined;
+      }
+
+      /** What is saved for exactly this locale, if anything. */
+      function stored(id: string, code: string): string | undefined {
+        const target = targetOf(id);
+
+        if (!target) {
+          return undefined;
+        }
+
+        if (!target.localized || code === state.defaultLocale) {
+          return text(target.record[target.key]);
+        }
+
+        return text(record(record(target.record.$locale)?.[code])?.[target.key]);
+      }
+
+      /** What the page shows for this locale. */
+      function resolved(id: string, code: string): string {
+        const target = targetOf(id);
+
+        if (!target) {
+          return '';
+        }
+
+        const { record: values, key } = target;
+
+        if (!target.localized) {
+          return text(values[key]) ?? target.fallback;
+        }
+
+        const locales = record(values.$locale) ?? {};
+        const language = code.split(/[-_]/)[0];
+
+        return (
+          text(record(locales[code])?.[key]) ??
+          (language !== code ? text(record(locales[language])?.[key]) : undefined) ??
+          text(values[key]) ??
+          target.fallback
+        );
+      }
+
+      /** Records a save locally, the same way the API stored it. */
+      function remember(id: string, code: string, value: string): void {
+        const target = targetOf(id);
+
+        if (!target) {
+          return;
+        }
+
+        const { record: values, key } = target;
+
+        if (!target.localized || code === state.defaultLocale) {
+          values[key] = value;
+          return;
+        }
+
+        const locales = record(values.$locale) ?? {};
+        const overrides = record(locales[code]) ?? {};
+
+        if (value === '') {
+          delete overrides[key];
+        } else {
+          overrides[key] = value;
+        }
+
+        locales[code] = overrides;
+        values.$locale = locales;
+      }
+
+      // ---- status --------------------------------------------------------------
+
+      function setStatus(text: string, kind: 'saving' | 'saved' | 'error' | '' = ''): void {
+        window.clearTimeout(statusTimer);
+        statusEl.textContent = text;
+        statusEl.dataset.kind = kind;
+
+        if (kind === 'saved') {
+          statusTimer = window.setTimeout(() => setStatus(''), 2500);
+        }
+      }
+
+      async function postJson(url: string, body: unknown): Promise<Record<string, unknown>> {
+        const res = await fetch(url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data: Record<string, unknown> = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.ok) {
+          throw new Error(String(data.detail || data.error || `HTTP ${res.status}`));
+        }
+
+        return data;
+      }
+
+      // ---- the page in the frame --------------------------------------------
+
+      // A save may land in one isolate while the next render runs in another
+      // that still memoises the settings for up to a minute, so every load in
+      // that window asks for a fresh read.
+      let lastSaveAt = 0;
+
+      function recentlySaved(): boolean {
+        return Date.now() - lastSaveAt < 60_000;
+      }
+
+      function editUrl(url: string, fresh = false): string {
+        const target = new URL(url, origin);
+        target.searchParams.set('__edit', '1');
+
+        // A URL nothing on the way has seen before, when a reload must not
+        // be answered from any cache.
+        if (fresh) {
+          target.searchParams.set('__v', String(Date.now()));
+        }
+
+        return `${target.pathname}${target.search}`;
+      }
+
+      /** Every frame load goes through here: same editUrl() rules, plus the busy dim. */
+      function loadFrame(url: string, fresh = false): void {
+        shownSections = null;
+        canvas.setAttribute('aria-busy', 'true');
+        frame.src = editUrl(url, fresh);
+      }
+
+      // Whether the frame has already been loaded a second time for the
+      // same sections mismatch; one retry, then the merchant is told.
+      let retriedSections = false;
+
+      /** Whether the section ids the page reports are the list's, in order. */
+      /**
+       * Whether the page reported the sections a given list would render.
+       *
+       * The list is passed in rather than defaulted, because the only caller
+       * runs BEFORE `show()` has switched pages — defaulting would compare the
+       * incoming page's render against the outgoing page's list, and every
+       * switch would look like a stale render.
+       */
+      function showsSections(shown: unknown, items: StoredSection[]): boolean {
+        const ids = Array.isArray(shown) ? shown.join('\n') : '';
+        return ids === visibleIds(items).join('\n');
+      }
+
+      function show(next: EditorPage, load: boolean): void {
+        // Nothing is being left on the first call, and nothing is selected then
+        // either.
+        const leaving = pageKnown && page.id !== next.id;
+
+        // Before the switch: a keystroke still in the debounce belongs to the
+        // page it was typed on, and flushing after would post it against the
+        // incoming one.
+        if (leaving) flushField();
+
+        page = next;
+        pageKnown = true;
+        pageName.textContent = next.label;
+        panelTitle.textContent = next.label;
+        openLink.href = next.url;
+
+        pagesList.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+          const current = button.dataset.page === next.id;
+          button.setAttribute('aria-current', current ? 'page' : 'false');
+        });
+
+        // A page without a list of its own says so; the gate also stops
+        // renderSections().
+        sectionsPanel.hidden = !hasList(next.id);
+        noSections.hidden = !sectionsPanel.hidden;
+
+        // A selection belongs to the page it was made on. Ids are only unique
+        // within a list, so carrying one across would leave the panel showing
+        // another page's fields — and renderRail skips a rebuild when the id
+        // has not changed, so it would not even notice.
+        if (leaving || !hasList(next.id)) {
+          selectedSection = null;
+          closeRail();
+        }
+
+        renderSections();
+        // The copy fields are built for one locale; the preview reporting a new
+        // one has to rebuild them, or an edit writes the old locale's text
+        // under the new one. Unforced: it will not rebuild under a live field.
+        renderRail();
+
+        if (load) {
+          loadFrame(next.url, recentlySaved());
+        }
+      }
+
+      /** The page the frame reports it is on, matched to the nav. */
+      function pageFor(url: string): EditorPage | undefined {
+        const { pathname } = new URL(url, origin);
+        const exact = state.pages.find((entry) => entry.url === pathname);
+
+        if (exact) {
+          return exact;
+        }
+
+        // A product or category the merchant clicked through to: same page,
+        // different record. The nav entry follows it.
+        for (const [id, prefix] of [
+          ['product', '/products/'],
+          ['category', '/categories/'],
+        ] as const) {
+          const entry = state.pages.find((candidate) => candidate.id === id);
+
+          if (entry && pathname.startsWith(prefix)) {
+            entry.url = pathname;
+            return entry;
+          }
+        }
+
+        return undefined;
+      }
+
+      function frameWindow(): Window | null {
+        return frame.contentWindow;
+      }
+
+      function pushToFrame(id: string): void {
+        frameWindow()?.postMessage(
+          { type: EDIT_MESSAGE, id, value: resolved(id, locale) },
+          origin,
+        );
+      }
+
+      /** Tells the page which section is selected, so it can outline it. */
+      function selectInFrame(id: string | null): void {
+        frameWindow()?.postMessage({ type: SECTION_SELECT_MESSAGE, id }, origin);
+      }
+
+      /**
+       * Asks the page to scroll a section into view.
+       *
+       * Deliberately not a flag on the select message. Selection is state, and
+       * the shell re-sends it to redraw the outline after a drop and after
+       * every reload — both of them paths that already own the scroll position,
+       * the reload one because it is putting the merchant back where they were.
+       * Scrolling to a section is an event, sent from the one gesture that asks
+       * for it, so there is no state message anyone has to remember to clear a
+       * flag on.
+       *
+       * Where to scroll, and whether to scroll at all, stays the page's to
+       * decide: it is the one that can measure the section and its header.
+       */
+      function revealInFrame(id: string): void {
+        // A reload in flight: the frame still answers, but as the document
+        // about to be replaced — whose scroll position is the one it hands on
+        // to the document coming in.
+        if (canvas.hasAttribute('aria-busy')) return;
+
+        frameWindow()?.postMessage({ type: SECTION_REVEAL_MESSAGE, id }, origin);
+      }
+
+      window.addEventListener('message', (event) => {
+        if (event.origin !== origin || event.source !== frameWindow()) {
+          return;
+        }
+
+        const data = event.data;
+
+        if (!data || typeof data.type !== 'string') {
+          return;
+        }
+
+        if (data.type === EDITED_MESSAGE && typeof data.id === 'string' && typeof data.value === 'string') {
+          remember(data.id, locale, data.value);
+          lastSaveAt = Date.now();
+          setStatus('Saved', 'saved');
+
+          // Cleared in the page: show what the copy now inherits.
+          if (data.value === '') {
+            pushToFrame(data.id);
+          }
+
+          // A section's heading names its row in the list.
+          if (sectionRef(data.id)) {
+            renderSections();
+          }
+
+          // The same copy may be open in the panel; keep it and its
+          // inherited/default tag in step with what the page now shows.
+          refreshField(data.id);
+        }
+
+        if (data.type === SECTION_HOVER_MESSAGE) {
+          highlightSection(typeof data.id === 'string' ? data.id : null);
+        }
+
+        if (data.type === SECTION_MOVE_MESSAGE && Array.isArray(data.order)) {
+          if (!state || !hasList()) return;
+
+          // A drop from a page that has not reported yet — the frame is on its
+          // way to the list's order — is not the page's order. Load it again,
+          // fresh, so nothing stale can be shown.
+          if (shownSections === null) {
+            loadFrame(page.url, true);
+            return;
+          }
+
+          const items = listFor();
+          const visible = visibleIds(items);
+
+          // The page was dragged from an order that is not the list's — a rail
+          // reorder is still saving, or the page is known to be stale — so its
+          // result would overwrite a newer change. The list wins.
+          if (shownSections.join('\n') !== visible.join('\n')) {
+            loadFrame(page.url, true);
+            return;
+          }
+
+          const order: string[] = data.order.filter((id: unknown): id is string => typeof id === 'string');
+          const valid =
+            order.length === visible.length &&
+            new Set(order).size === order.length &&
+            order.every((id) => visible.includes(id));
+
+          // The page and the list disagree: the list wins, and the page shows it.
+          if (!valid) {
+            loadFrame(page.url, true);
+            return;
+          }
+
+          // A hidden section keeps its place in the list; only the visible ones
+          // move around it — the page could not have dragged what it never drew.
+          // One id is taken per visible slot: `queue.shift()` must not sit inside
+          // the `find` predicate, which runs once per entry probed, not per slot.
+          const queue = [...order];
+          const next = items.map((item) => {
+            if (item.hidden === true) return item;
+
+            const id = queue.shift();
+            return items.find((entry) => entry.id === id);
+          });
+
+          // Nothing above should be able to leave a hole, but a bad list must
+          // never reach the stored list: the page is asked again instead.
+          if (next.length !== items.length || next.some((entry) => !entry)) {
+            loadFrame(page.url, true);
+            return;
+          }
+
+          shownSections = order;
+
+          // The dragged section becomes the selected one, so the panel and the
+          // preview's outline follow it — this path never reloads, so the
+          // outline is sent here rather than waiting on a page message.
+          if (typeof data.id === 'string' && order.includes(data.id) && selectedSection !== data.id) {
+            selectedSection = data.id;
+            if (railOpen) selectInFrame(selectedSection);
+          }
+
+          saveSections(next as StoredSection[], { reload: false });
+          return;
+        }
+
+        if (data.type === SECTION_HIDE_MESSAGE && typeof data.id === 'string' && typeof data.hidden === 'boolean') {
+          if (state && hasList()) setHidden(data.id, data.hidden);
+          return;
+        }
+
+        if (data.type === SECTION_DELETE_MESSAGE && typeof data.id === 'string') {
+          if (state && hasList()) confirmDelete(data.id, null);
+          return;
+        }
+
+        // A click on a blank part of a section: it is selected and its settings
+        // open, but focus stays in the preview — nothing was activated.
+        if (data.type === SECTION_SELECT_MESSAGE && typeof data.id === 'string') {
+          if (state && hasList()) openRail(data.id, false);
+          return;
+        }
+
+        // The chip's Settings button: a button was pressed, so focus follows.
+        if (data.type === SECTION_SETTINGS_MESSAGE && typeof data.id === 'string') {
+          if (state && hasList()) openRail(data.id, true);
+          return;
+        }
+
+        if (data.type === PAGE_MESSAGE && typeof data.url === 'string') {
+          shownPath = new URL(data.url, origin).pathname;
+
+          if (typeof data.locale === 'string') {
+            locale = data.locale;
+          }
+
+          shownSections = Array.isArray(data.sections)
+            ? data.sections.filter((id: unknown): id is string => typeof id === 'string')
+            : null;
+
+          // The frame starts loading before the state call returns; a page
+          // that reports in first has nothing to match against yet. boot()
+          // shows the home page once state is in, so nothing is lost.
+          if (!state) {
+            return;
+          }
+
+          const next = pageFor(data.url) ?? page;
+
+          // The page says what it is; the URL is only a guess. When the two
+          // disagree — an unmatched URL, a record that 404s, a page with no
+          // list — the sections panel says so rather than showing the previous
+          // page's list, which is how a save writes one page's sections under
+          // another page's key.
+          const reported = typeof data.page === 'string' ? data.page : null;
+          const trusted = reported !== null && reported === next.id;
+
+          // The page must show the sections just saved. A render that read
+          // them before the save landed is loaded once more, past any cache.
+          if (
+            trusted &&
+            hasList(next.id) &&
+            Array.isArray(data.sections) &&
+            !showsSections(data.sections, listFor(next.id))
+          ) {
+            if (!retriedSections) {
+              retriedSections = true;
+              loadFrame(next.url, true);
+              return;
+            }
+
+            setStatus('The page shows other sections than the list — reload', 'error');
+          } else {
+            retriedSections = false;
+          }
+
+          show(next, false);
+
+          // Every save ends in a reload, so the outline is redrawn here rather
+          // than only when the selection changes. Only while the panel is open:
+          // the outline says which section the panel is showing.
+          if (trusted && hasList(next.id) && railOpen && selectedSection) {
+            selectInFrame(selectedSection);
+          }
+        }
+      });
+
+      // ---- left nav: pages ---------------------------------------------------
+
+      function renderPages(): void {
+        pagesList.replaceChildren(
+          ...state.pages.map((entry) => {
+            const item = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'ed__link';
+            button.dataset.page = entry.id;
+            button.textContent = entry.label;
+            button.addEventListener('click', () => {
+              // The page the frame already shows: into its sections without
+              // losing the frame's place. Anything else — including a path the
+              // nav could not match — loads.
+              show(entry, new URL(entry.url, origin).pathname !== shownPath);
+              setNavView('page');
+              panelTitle.focus();
+            });
+            item.append(button);
+            return item;
+          }),
+        );
+      }
+
+      function setNavView(view: 'pages' | 'page'): void {
+        pagesView.hidden = view !== 'pages';
+        pageView.hidden = view !== 'page';
+      }
+
+      backButton.addEventListener('click', () => {
+        setNavView('pages');
+        pagesList.querySelector<HTMLButtonElement>('[aria-current="page"]')?.focus();
+      });
+
+      // ---- settings dialog ---------------------------------------------------
+
+      function settingValue(field: SettingsField): unknown {
+        const value = state.settings.values[field.id];
+
+        if (field.type === 'image') {
+          return typeof value === 'string' ? value : record(value)?.url ?? '';
+        }
+
+        return value ?? field.default ?? '';
+      }
+
+      /** Shows one tab, leaving the others in the DOM so nothing is lost on switch. */
+      function selectSettingsTab(id: string, focus = false): void {
+        for (const button of settingsTabButtons) {
+          const on = button.dataset.tab === id;
+          button.setAttribute('aria-selected', on ? 'true' : 'false');
+          button.tabIndex = on ? 0 : -1;
+          if (on && focus) button.focus();
+        }
+        for (const panel of settingsPanels) {
+          panel.hidden = panel.dataset.panel !== id;
+        }
+      }
+
+      function renderSettings(): void {
+        const wraps = state.settings.fields.map((field) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'ed-field';
+
+            const label = document.createElement('label');
+            label.className = 'ed-field__label';
+            label.htmlFor = `setting-${field.id}`;
+            label.textContent = field.label;
+
+            wrap.append(label);
+
+            const value = settingValue(field);
+
+            if (field.type === 'toggle') {
+              wrap.className = 'ed-field ed-field--toggle';
+              const input = document.createElement('input');
+              input.type = 'checkbox';
+              input.id = `setting-${field.id}`;
+              input.name = field.id;
+              input.checked = value !== false;
+              wrap.replaceChildren(input, label);
+            } else if (field.type === 'color') {
+              const row = document.createElement('div');
+              row.className = 'ed-color';
+
+              const text = document.createElement('input');
+              text.type = 'text';
+              text.className = 'ed-input ed-input--mono';
+              text.id = `setting-${field.id}`;
+              text.name = field.id;
+              text.value = typeof value === 'string' ? value : '';
+              text.placeholder = typeof field.default === 'string' ? field.default : '';
+              text.spellcheck = false;
+
+              const swatch = document.createElement('input');
+              swatch.type = 'color';
+              swatch.className = 'ed-swatch';
+              swatch.setAttribute('aria-label', `${field.label} picker`);
+              swatch.value = hex6(text.value) ?? hex6(text.placeholder) ?? '#000000';
+
+              swatch.addEventListener('input', () => {
+                text.value = swatch.value;
+              });
+              text.addEventListener('input', () => {
+                const six = hex6(text.value);
+                if (six) swatch.value = six;
+              });
+
+              row.append(swatch, text);
+              wrap.append(row);
+            } else if (field.type === 'image') {
+              // The url box inside the widget carries the name and the id, so
+              // changedSettings() and the label's `for` both still find it.
+              wrap.append(
+                imageField({
+                  id: `setting-${field.id}`,
+                  name: field.id,
+                  value: String(settingValue(field) ?? ''),
+                  onChange: updateDirty,
+                }),
+              );
+            } else {
+              const input = document.createElement('input');
+              input.type = field.type === 'number' ? 'number' : 'text';
+              input.className = 'ed-input';
+              input.id = `setting-${field.id}`;
+              input.name = field.id;
+              input.value = value === null || value === undefined ? '' : String(value);
+              input.placeholder =
+                field.placeholder ?? (field.default === undefined ? '' : String(field.default));
+
+              if (field.type === 'number') {
+                input.min = '0';
+                input.step = '1';
+              }
+
+              wrap.append(input);
+            }
+
+            if (field.description) {
+              const hint = document.createElement('p');
+              hint.className = 'ed-field__hint';
+              hint.textContent = field.description;
+              wrap.append(hint);
+            }
+
+            const input = wrap.querySelector<HTMLInputElement>(`[name="${field.id}"]`);
+
+            if (input) {
+              input.dataset.initial =
+                field.type === 'toggle' ? String(input.checked) : input.value;
+            }
+
+            return wrap;
+        });
+
+        // Every tab is rendered and kept in the DOM; only the inactive ones are
+        // hidden. A half-typed value on another tab therefore survives the
+        // switch, and `changedSettings()` still sees every field whatever is on
+        // screen — the save is of the whole dialog, not of the visible tab.
+        for (const panel of settingsPanels) {
+          panel.replaceChildren(
+            ...wraps.filter(
+              (_, i) => state.settings.fields[i].tab === panel.dataset.panel,
+            ),
+          );
+        }
+      }
+
+      function hex6(value: string): string | undefined {
+        const trimmed = value.trim();
+
+        if (/^#[0-9a-f]{6}$/i.test(trimmed)) {
+          return trimmed.toLowerCase();
+        }
+
+        if (/^#[0-9a-f]{3}$/i.test(trimmed)) {
+          return `#${[...trimmed.slice(1)].map((c) => c + c).join('')}`.toLowerCase();
+        }
+
+        return undefined;
+      }
+
+      /** Only what changed since the form was rendered, in the API's shape. */
+      function changedSettings(): Record<string, unknown> {
+        const values: Record<string, unknown> = {};
+
+        for (const field of state.settings.fields) {
+          const input = settingsForm.elements.namedItem(field.id) as HTMLInputElement | null;
+          if (!input) continue;
+
+          const shown = field.type === 'toggle' ? String(input.checked) : input.value;
+          if (shown === input.dataset.initial) continue;
+
+          if (field.type === 'toggle') {
+            values[field.id] = input.checked;
+          } else if (field.type === 'number') {
+            values[field.id] = input.value.trim() === '' ? '' : Number(input.value);
+          } else {
+            values[field.id] = input.value;
+          }
+        }
+
+        return values;
+      }
+
+      function updateDirty(): void {
+        settingsDirty.hidden = Object.keys(changedSettings()).length === 0;
+      }
+
+      /** True when closing loses nothing, or the merchant agrees to lose it. */
+      function discardOk(): boolean {
+        return settingsDirty.hidden || window.confirm('Discard unsaved changes?');
+      }
+
+      function openSettings(): void {
+        renderSettings(); // fresh values and fresh data-initial baselines
+        settingsError.textContent = '';
+        updateDirty();
+        settingsDialog.showModal();
+
+        // The first <input> inside an image field is its hidden file input;
+        // focusing that is a no-op that would strand focus on the dialog.
+        selectSettingsTab(SETTINGS_TAB_IDS[0]);
+        settingsPanels[0]
+          .querySelector<HTMLElement>('input:not([type="file"]), select, textarea')
+          ?.focus();
+      }
+
+      const SETTINGS_TAB_IDS = settingsTabButtons.map((b) => b.dataset.tab ?? '');
+
+      settingsTabs.addEventListener('click', (event) => {
+        const id = (event.target as HTMLElement).closest<HTMLElement>('[data-tab]')?.dataset.tab;
+        if (id) selectSettingsTab(id);
+      });
+
+      // A tablist moves between its tabs with the arrows, which is what a
+      // screen reader user expects once the strip announces itself as one.
+      settingsTabs.addEventListener('keydown', (event) => {
+        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+        if (!step) return;
+        event.preventDefault();
+        const here = SETTINGS_TAB_IDS.indexOf(
+          settingsTabButtons.find((b) => b.tabIndex === 0)?.dataset.tab ?? '',
+        );
+        const next = (here + step + SETTINGS_TAB_IDS.length) % SETTINGS_TAB_IDS.length;
+        selectSettingsTab(SETTINGS_TAB_IDS[next], true);
+      });
+
+      settingsOpen.addEventListener('click', openSettings);
+      settingsClose.addEventListener('click', () => { if (discardOk()) settingsDialog.close(); });
+      settingsCancel.addEventListener('click', () => { if (discardOk()) settingsDialog.close(); });
+
+      // Backdrop: the dialog has no padding and the form fills it, so a click whose
+      // target is the dialog itself landed outside the form. A click is dispatched
+      // to the common ancestor of press and release, so a text selection dragged
+      // out of an input onto the backdrop also targets the dialog: only a press
+      // that started on the backdrop counts.
+      let pressedOnBackdrop = false;
+
+      settingsDialog.addEventListener('pointerdown', (event) => {
+        pressedOnBackdrop = event.target === settingsDialog;
+      });
+      settingsDialog.addEventListener('click', (event) => {
+        const onBackdrop = pressedOnBackdrop && event.target === settingsDialog;
+        pressedOnBackdrop = false;
+        if (onBackdrop && discardOk()) settingsDialog.close();
+      });
+
+      // Escape is handled here rather than left to the browser: `closedby="none"`
+      // on the dialog stops browsers that know it from closing on their own, and
+      // elsewhere Chromium only lets `cancel` be prevented while the page has
+      // unconsumed user activation, so a second press would force-close a dirty
+      // form. The `cancel` listener stays as the fallback.
+      settingsDialog.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        if (discardOk()) settingsDialog.close();
+      });
+      settingsDialog.addEventListener('cancel', (event) => {
+        if (!discardOk()) event.preventDefault();
+      });
+
+      // However it closed: no half-typed values survive, focus goes back to the trigger.
+      settingsDialog.addEventListener('close', () => {
+        renderSettings();
+        updateDirty();
+        settingsError.textContent = '';
+        settingsOpen.focus();
+      });
+
+      settingsForm.addEventListener('input', updateDirty);
+      settingsForm.addEventListener('change', updateDirty);
+
+      settingsForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        settingsError.textContent = '';
+
+        // Only what changed: an untouched field showing its default stays
+        // unset, so the dashboard keeps showing it as the default too.
+        const values = changedSettings();
+
+        // The status pill is inert while the dialog is up and a change made
+        // then is never announced, so the dialog closes before the status is
+        // set. Closing re-renders the form from the current values.
+        if (Object.keys(values).length === 0) {
+          settingsDialog.close();
+          setStatus('Nothing to save', 'saved');
+          return;
+        }
+
+        settingsSave.disabled = true;
+        setStatus('Saving…', 'saving');
+
+        try {
+          const data = await postJson('/editor/api/settings', { values });
+          state.settings.values = record(data.values) ?? {};
+          lastSaveAt = Date.now();
+          loadFrame(page.url, true);
+          settingsDialog.close();
+          setStatus('Saved', 'saved');
+        } catch (err) {
+          const message = `Error — ${(err as Error).message}`;
+          setStatus(message, 'error');
+          settingsError.textContent = message; // the status pill is behind the backdrop
+        } finally {
+          settingsSave.disabled = false;
+
+          // Disabling the focused button dropped focus to the body; with the
+          // dialog still up (the error path) it goes back where it was.
+          if (settingsDialog.open && !settingsDialog.contains(document.activeElement)) {
+            settingsSave.focus();
+          }
+        }
+      });
+
+      // ---- left rail: the home page's sections -------------------------------
+
+      // The row the next section goes in after, the one a drag started on,
+      // and whether the drop lands before the row under the pointer (its
+      // top half) or after it (its bottom half).
+      let selectedSection: string | null = null;
+      let draggedSection: string | null = null;
+      let dropBefore = false;
+
+      /** "Text — Made in small runs." */
+      function sectionName(item: StoredSection): string {
+        const heading = resolved(`sec:${item.id}:heading`, locale).split('\n')[0].trim();
+        return heading;
+      }
+
+      /** The ids the page actually renders: the list, minus what is hidden. */
+      /**
+       * The current page's list, or another page's by id. Total on purpose: a
+       * page with no list of its own answers with an empty one rather than
+       * throwing, so every caller can ask without checking first.
+       */
+      function listFor(id: string = page.id): StoredSection[] {
+        return state.sections.lists[id] ?? [];
+      }
+
+      /** Whether this page keeps a section list at all. */
+      function hasList(id: string = page.id): boolean {
+        return id in state.sections.lists;
+      }
+
+      function visibleIds(items: StoredSection[] = listFor()): string[] {
+        return items.filter((item) => item.hidden !== true).map((item) => item.id);
+      }
+
+      function renderSections(): void {
+        if (sectionsPanel.hidden) {
+          return;
+        }
+
+        const items = listFor();
+
+        if (selectedSection && !items.some((item) => item.id === selectedSection)) {
+          selectedSection = null;
+        }
+
+        // The list is rebuilt whole; the control that had focus gets it back,
+        // by section and name, so a keyboard reorder carries on where it was.
+        const active = document.activeElement;
+        const focused =
+          active instanceof HTMLElement && sectionList.contains(active) ? active : null;
+        const focusedSection = focused?.closest<HTMLElement>('.ed-sec')?.dataset.section;
+        const focusedLabel = focused?.getAttribute('aria-label') ?? '';
+
+        sectionList.replaceChildren(
+          ...items.map((item, index) => {
+            const def = typeFor(item.type);
+            const row = document.createElement('li');
+            row.className = 'ed-sec';
+            row.dataset.section = item.id;
+            row.classList.toggle('is-selected', item.id === selectedSection);
+            row.classList.toggle('is-hidden', item.hidden === true);
+
+            const handle = document.createElement('span');
+            handle.className = 'ed-sec__handle';
+            handle.setAttribute('aria-hidden', 'true');
+            handle.title = 'Drag to reorder';
+            handle.textContent = '\u2807';
+
+            // The handle is the drag source, not the row: only a press on it
+            // starts a drag, so the label and tool buttons never fight one,
+            // and nothing depends on toggling `draggable` mid-gesture. The
+            // event bubbles to the row's listeners below. Touch never starts
+            // an HTML5 drag; the arrows are its path.
+            handle.draggable = true;
+
+            const pick = document.createElement('button');
+            pick.type = 'button';
+            pick.className = 'ed-sec__label';
+            pick.setAttribute('aria-pressed', String(item.id === selectedSection));
+            // The arrows are gone; this is what is left to announce the
+            // keyboard reorder the row's own listener handles.
+            pick.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown');
+
+            const type = document.createElement('span');
+            type.className = 'ed-sec__type';
+            type.textContent = def?.label ?? item.type;
+
+            const name = document.createElement('span');
+            name.className = 'ed-sec__name';
+            name.textContent = sectionName(item);
+
+            pick.append(type, name);
+            pick.addEventListener('click', () => {
+              if (selectedSection === item.id) {
+                selectedSection = null;
+                closeRail();
+                selectInFrame(null);
+                renderSections();
+              } else {
+                openRail(item.id, false);
+                // After openRail, so the outline is already on the section
+                // when the page moves to it.
+                revealInFrame(item.id);
+              }
+            });
+
+            // Deleting asks in a dialog — the same one the chip in the preview opens.
+            const anchored = isAnchor(item);
+
+            const del = sectionTool('\u00D7', 'Delete', anchored, () =>
+              confirmDelete(item.id, del),
+            );
+            del.setAttribute('aria-haspopup', 'dialog');
+            if (anchored) del.title = anchorNote();
+
+            // The eye: hidden from shoppers or not. Its label never changes, so
+            // focus finds it again after the list is rebuilt; pressed = hidden.
+            const eye = sectionTool('', 'Hidden', anchored, () =>
+              setHidden(item.id, item.hidden !== true),
+            );
+            eye.innerHTML = item.hidden ? EYE_OFF : EYE_ON;
+            eye.setAttribute('aria-pressed', String(item.hidden === true));
+            eye.title = anchored
+              ? anchorNote()
+              : item.hidden
+                ? 'Hidden from shoppers \u2014 show'
+                : 'Shown to shoppers \u2014 hide';
+
+            const tools = document.createElement('div');
+            tools.className = 'ed-sec__tools';
+            tools.append(eye, del);
+
+            row.append(handle, pick, tools);
+
+            // Not while a drag is on: the frame's outline would chase the ghost.
+            row.addEventListener('mouseenter', () => {
+              if (!draggedSection) hoverInFrame(item.id);
+            });
+            row.addEventListener('mouseleave', () => {
+              if (!draggedSection) hoverInFrame(null);
+            });
+
+            // Alt + ↑/↓ on any control in the row: the drag, from the keyboard.
+            row.addEventListener('keydown', (event) => {
+              if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) {
+                return;
+              }
+
+              const to = event.key === 'ArrowUp' ? index - 1 : index + 1;
+
+              if (to >= 0 && to < items.length) {
+                event.preventDefault();
+                moveSection(index, to);
+              }
+            });
+
+            row.addEventListener('dragstart', (event) => {
+              draggedSection = item.id;
+              event.dataTransfer?.setData('text/plain', item.id);
+              if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                // The whole row travels under the pointer, not just the glyph.
+                event.dataTransfer.setDragImage(row, 16, row.offsetHeight / 2);
+              }
+              // Faded once the browser has taken its picture of the row,
+              // so the ghost under the pointer is not faded too — unless
+              // the drag is already over by then.
+              requestAnimationFrame(() => {
+                if (draggedSection === item.id) row.classList.add('is-dragging');
+              });
+            });
+            row.addEventListener('dragend', () => {
+              draggedSection = null;
+              row.classList.remove('is-dragging');
+              clearDropMarks();
+            });
+            // The pointer's half of the row decides which edge the line is
+            // drawn on and where the drop lands: before the row, or after it.
+            row.addEventListener('dragover', (event) => {
+              if (!draggedSection || draggedSection === item.id) {
+                return;
+              }
+
+              event.preventDefault();
+              if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+
+              const rect = row.getBoundingClientRect();
+              dropBefore = event.clientY < rect.top + rect.height / 2;
+              clearDropMarks();
+              row.classList.add(dropBefore ? 'is-over-before' : 'is-over-after');
+            });
+            row.addEventListener('dragleave', (event) => {
+              // Crossing into one of the row's own buttons is not leaving it.
+              if (event.relatedTarget instanceof Node && row.contains(event.relatedTarget)) {
+                return;
+              }
+
+              row.classList.remove('is-over-before', 'is-over-after');
+            });
+            row.addEventListener('drop', (event) => {
+              event.preventDefault();
+
+              // Cleared here, not only in dragend: the move re-renders the
+              // list, which detaches the source row, and not every browser
+              // still sends a detached row its dragend.
+              const from = items.findIndex((entry) => entry.id === draggedSection);
+              draggedSection = null;
+              clearDropMarks();
+
+              if (from === -1) {
+                return;
+              }
+
+              let to = index + (dropBefore ? 0 : 1);
+              if (from < to) to -= 1;
+
+              if (to !== from) {
+                selectedSection = items[from].id;
+                moveSection(from, to);
+              }
+            });
+
+            return row;
+          }),
+        );
+
+        if (focusedSection) {
+          const row = sectionList.querySelector<HTMLElement>(
+            `[data-section="${CSS.escape(focusedSection)}"]`,
+          );
+          const same = focusedLabel
+            ? row?.querySelector<HTMLButtonElement>(`[aria-label="${CSS.escape(focusedLabel)}"]`)
+            : null;
+
+          // The same control, or — with the row gone, because it was
+          // removed — the button that adds the next one.
+          (same ?? row?.querySelector<HTMLElement>('.ed-sec__label') ?? sectionAdd).focus();
+        }
+      }
+
+      /**
+       * Whether this item is the page's required section — the one thing the
+       * page exists to show. It can be moved and its settings edited; it cannot
+       * be hidden, deleted, or added, because it is always already there.
+       */
+      function isAnchor(item: StoredSection): boolean {
+        return typeFor(item.type)?.anchor === page.id;
+      }
+
+      function anchorNote(): string {
+        return `This page always shows its ${page.label.toLowerCase()} section`;
+      }
+
+      function sectionTool(
+        glyph: string,
+        label: string,
+        disabled: boolean,
+        action: () => void,
+      ): HTMLButtonElement {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ed-sec__btn';
+        button.textContent = glyph;
+        button.setAttribute('aria-label', label);
+        button.title = label;
+        button.disabled = disabled;
+        button.addEventListener('click', action);
+        return button;
+      }
+
+      function clearDropMarks(): void {
+        sectionList.querySelectorAll('.is-over-before, .is-over-after').forEach((el) => {
+          el.classList.remove('is-over-before', 'is-over-after');
+        });
+      }
+
+      function moveSection(from: number, to: number): void {
+        const next = [...listFor()];
+        const [item] = next.splice(from, 1);
+        next.splice(to, 0, item);
+        saveSections(next);
+
+        // The arrows carried the only announcement of a keyboard reorder;
+        // this is it now.
+        const moved = next[to];
+        const name = sectionName(moved) || typeFor(moved.type)?.label || moved.type;
+        sectionsStatus.textContent = `${name} moved to ${to + 1} of ${next.length}`;
+      }
+
+      /** Hides a section from shoppers, or shows it again; the page keeps it either way. */
+      function setHidden(id: string, hidden: boolean): void {
+        const items = listFor();
+        const target = items.find((item) => item.id === id);
+        if (!target) return;
+
+        // Also reachable from the chip in the preview, so a disabled button in
+        // the rail is not the whole guard. Said out loud: a silent no-op reads
+        // as a broken control.
+        if (isAnchor(target)) {
+          setStatus(anchorNote(), 'error');
+          return;
+        }
+
+        saveSections(
+          items.map((item) => {
+            if (item.id !== id) return item;
+            const copy = { ...item };
+            delete copy.hidden;
+            return hidden ? { ...copy, hidden: true } : copy;
+          }),
+        );
+      }
+
+      // ---- deleting a section: asked in a dialog --------------------------------
+
+      let pendingDelete: string | null = null;
+      // The page that section belongs to. The dialog outlives a page switch —
+      // the frame can report a new page while it is open — and a section id
+      // only means anything inside its own page's list.
+      let pendingDeletePage = '';
+      // What opened the dialog, to give focus back to. A request from the
+      // preview's chip gets the frame: its document still holds the chip's
+      // button as its own active element, so focus lands back on it.
+      let deleteTrigger: HTMLElement | null = null;
+
+      function confirmDelete(id: string, trigger: HTMLElement | null): void {
+        const items = listFor();
+        const item = items.find((entry) => entry.id === id);
+        if (!item || deleteDialog.open) return;
+
+        if (isAnchor(item)) {
+          setStatus(anchorNote(), 'error');
+          return;
+        }
+
+        const def = typeFor(item.type);
+        const name = sectionName(item);
+        const what = `the ${(def?.label ?? item.type).toLowerCase()} section${name ? ` “${name}”` : ''}`;
+        pendingDelete = id;
+        pendingDeletePage = page.id;
+        deleteTrigger = trigger ?? frame;
+
+        // An empty list is the standard page again, not an empty one: said
+        // here, so it is no surprise when two sections appear in its place.
+        if (items.length === 1) {
+          deleteText.textContent = `Delete ${what}? It is the last one: the standard hero and product grid come back in its place.`;
+          deleteNote.textContent = 'Its copy in every language goes with it. For an empty page, hide it instead.';
+        } else {
+          deleteText.textContent = `Delete ${what}?`;
+          deleteNote.textContent =
+            'Its copy in every language goes with it. To keep it off the page without losing anything, hide it instead.';
+        }
+
+        deleteDialog.showModal();
+        deleteCancel.focus();
+      }
+
+      deleteClose.addEventListener('click', () => deleteDialog.close());
+      deleteCancel.addEventListener('click', () => deleteDialog.close());
+
+      // Same backdrop rule as the settings dialog: press and release both on the dialog itself.
+      let pressedOnDeleteBackdrop = false;
+      deleteDialog.addEventListener('pointerdown', (event) => {
+        pressedOnDeleteBackdrop = event.target === deleteDialog;
+      });
+      deleteDialog.addEventListener('click', (event) => {
+        const onBackdrop = pressedOnDeleteBackdrop && event.target === deleteDialog;
+        pressedOnDeleteBackdrop = false;
+        if (onBackdrop) deleteDialog.close();
+      });
+      // closedby="none" stops the browser closing it on its own; Escape is ours.
+      deleteDialog.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        deleteDialog.close();
+      });
+      // However it closed: focus goes back to what asked, or to Add once the row is gone.
+      deleteDialog.addEventListener('close', () => {
+        pendingDelete = null;
+        const target = deleteTrigger?.isConnected ? deleteTrigger : sectionAdd;
+        deleteTrigger = null;
+        target.focus();
+      });
+      deleteForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const id = pendingDelete;
+        const from = pendingDeletePage;
+        // Closed first: the status pill sits behind the backdrop.
+        deleteDialog.close();
+        if (id) {
+          saveSections(
+            listFor(from).filter((entry) => entry.id !== id),
+            { page: from },
+          );
+        }
+      });
+
+      /** An id no section in `items` has: the type, numbered. */
+      function newSectionId(type: string, items: StoredSection[]): string {
+        let n = items.length + 1;
+        let id = `${type}-${n}`;
+
+        while (items.some((item) => item.id === id)) {
+          n += 1;
+          id = `${type}-${n}`;
+        }
+
+        return id;
+      }
+
+      function addSection(def: SectionTypeDef): void {
+        const items = listFor();
+        const item = { id: newSectionId(def.type, items), type: def.type, ...def.template } as StoredSection;
+        const after = items.findIndex((entry) => entry.id === selectedSection);
+        const next = [...items];
+
+        next.splice(after === -1 ? items.length : after + 1, 0, item);
+        selectedSection = item.id;
+        sectionPicker.hidden = true;
+        sectionAdd.setAttribute('aria-expanded', 'false');
+        saveSections(next);
+      }
+
+      // Saves go out one after another, in the order they were made, and
+      // only the newest reply is acted on: a second quick reorder is never
+      // undone by the first one's answer.
+      let saveChain = Promise.resolve();
+      let saveSeq = 0;
+      // The list as the server last accepted it: what a failed save falls
+      // back to — not the list before it, which an earlier save may have
+      // failed to store as well.
+      // The page the open panel belongs to. An edit made in it can land long
+      // after the merchant has moved on — an image upload takes seconds, a
+      // debounced keystroke 400ms — and it must be saved against the page it
+      // was made on, not whichever one is on screen when it resolves.
+      let railPage = '';
+
+      // Per page, because a save in flight is a save of one page's list: a
+      // reply that arrives after the merchant has moved on must roll back the
+      // page it was posted for, never whichever page is on screen now.
+      const savedSections: Record<string, StoredSection[]> = {};
+
+      // Whether the frame must be reloaded once the newest save settles. A save
+      // that is superseded still leaves its intent here, so the one that answers
+      // carries it out.
+      let pendingReload = false;
+
+      /** Posts the whole list, then shows the page again with it. */
+      function saveSections(
+        next: StoredSection[],
+        options: { reload?: boolean; page?: string } = {},
+      ): void {
+        const pageId = options.page ?? page.id;
+
+        // A page with no list of its own cannot be saved to; a stray deferred
+        // edit must not invent one, because an invented key makes the shell
+        // believe that page has sections.
+        if (!hasList(pageId)) return;
+
+        state.sections.lists[pageId] = next;
+        pendingReload ||= options.reload ?? true;
+        renderSections();
+        renderRail();
+        setStatus('Saving…', 'saving');
+
+        const seq = ++saveSeq;
+        // The page is captured here, at issue time. A rejected promise anywhere
+        // in the chain would strand every later save, so the chain is kept
+        // whole and each post reports its own failure.
+        saveChain = saveChain.then(() => postSections(next, seq, pageId)).catch(() => {});
+      }
+
+      async function postSections(
+        next: StoredSection[],
+        seq: number,
+        pageId: string,
+      ): Promise<void> {
+        try {
+          const data = await postJson('/editor/api/sections', { page: pageId, sections: next });
+          // Below the guard: a superseded reply must not leave a rollback
+          // target that was never applied.
+          if (seq !== saveSeq) return;
+          savedSections[pageId] = (data.sections as StoredSection[]) ?? next;
+          state.sections.lists[pageId] = savedSections[pageId];
+          lastFieldKey = null;
+          // A field marked by an earlier failure is good again; the panel is
+          // not necessarily rebuilt (the merchant may still be in the field),
+          // so the marks are cleared here the way a copy field clears its own.
+          railFields.querySelectorAll('.is-error').forEach((el) => el.classList.remove('is-error'));
+          setStatus('Saved', 'saved');
+          // The server's normalised list may have dropped the section the panel
+          // is showing; renderRail closes the panel when it cannot find it.
+          renderRail();
+        } catch (err) {
+          if (seq !== saveSeq) return;
+          state.sections.lists[pageId] = savedSections[pageId] ?? [];
+          setStatus(`Error — ${(err as Error).message}`, 'error');
+
+          // A validation 400 answers well inside the 400 ms debounce, so a
+          // forced rebuild can land under a half-typed field. When the merchant
+          // is still in the panel, only the offending field is marked.
+          if (railOpen) {
+            if (!railFields.contains(document.activeElement)) renderRail(true);
+            if (lastFieldKey) {
+              railFields
+                .querySelector(`[data-field="${CSS.escape(lastFieldKey)}"]`)
+                ?.classList.add('is-error');
+            }
+          }
+        }
+
+        renderSections();
+        lastSaveAt = Date.now();
+
+        const reload = pendingReload;
+        pendingReload = false;
+
+        if (!reload && shownSections && shownSections.join('\n') === visibleIds().join('\n')) {
+          // The page dragged itself there; nothing to reload.
+        } else {
+          loadFrame(page.url, true);
+        }
+      }
+
+      function renderPicker(): void {
+        sectionPicker.replaceChildren(
+          // A required section is never addable: its page always has it, and
+          // no other page may.
+          ...state.sections.types
+            .filter((def) => !def.anchor)
+            .map((def) => {
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.className = 'ed-picker__item';
+
+              const type = document.createElement('span');
+              type.className = 'ed-picker__type';
+              type.textContent = def.label;
+
+              const desc = document.createElement('span');
+              desc.className = 'ed-picker__desc';
+              desc.textContent = def.description;
+
+              button.append(type, desc);
+              button.addEventListener('click', () => addSection(def));
+              return button;
+            }),
+        );
+      }
+
+      sectionAdd.addEventListener('click', () => {
+        const open = sectionPicker.hidden;
+        sectionPicker.hidden = !open;
+        sectionAdd.setAttribute('aria-expanded', String(open));
+      });
+
+      // The picker and the help note are both popovers; Escape is their way
+      // out, the picker first because it is the one that covers the list.
+      sectionsPanel.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+
+        if (!sectionPicker.hidden) {
+          sectionPicker.hidden = true;
+          sectionAdd.setAttribute('aria-expanded', 'false');
+          sectionAdd.focus();
+          return;
+        }
+
+        if (!sectionsHelp.hidden) {
+          sectionsHelp.hidden = true;
+          sectionsInfo.setAttribute('aria-expanded', 'false');
+          sectionsInfo.focus();
+        }
+      });
+
+      sectionsInfo.addEventListener('click', () => {
+        const open = sectionsHelp.hidden;
+        sectionsHelp.hidden = !open;
+        sectionsInfo.setAttribute('aria-expanded', String(open));
+      });
+
+      function hoverInFrame(id: string | null): void {
+        frameWindow()?.postMessage({ type: SECTION_HOVER_MESSAGE, id }, origin);
+      }
+
+      /** Marks the row of the section under the pointer in the page. */
+      function highlightSection(id: string | null): void {
+        sectionList.querySelectorAll<HTMLElement>('.ed-sec').forEach((row) => {
+          row.classList.toggle('is-hover', row.dataset.section === id);
+        });
+      }
+
+      // ---- right panel: one section's settings --------------------------------
+
+      let railOpen = false;
+      // What the panel currently shows, so a save does not rebuild it under a
+      // field the merchant is typing in.
+      let railFor: string | null = null;
+      let railType = '';
+      // The locale the copy fields were built for: when the preview changes
+      // language they hold the wrong text, so the panel has to be rebuilt.
+      let railLocale = '';
+      // The feature field a save was made from, to mark when that save fails.
+      let lastFieldKey: string | null = null;
+
+      function openRail(id: string, focus: boolean): void {
+        // Switching sections destroys the focused input, and removing a focused
+        // element does not reliably fire blur — so the pending save goes out here.
+        flushField();
+
+        railPage = page.id;
+        selectedSection = id;
+        railOpen = true;
+        rail.hidden = false;
+        editor.classList.add('has-rail');
+        renderSections();
+        renderRail(true);
+        selectInFrame(id);
+        if (focus) railHeading.focus();
+      }
+
+      function closeRail(): void {
+        // Focus first: #rail-close lives inside #rail, so hiding the panel with
+        // focus still in it drops focus to <body>.
+        if (rail.contains(document.activeElement)) {
+          const row = selectedSection
+            ? sectionList.querySelector<HTMLElement>(
+                `[data-section="${CSS.escape(selectedSection)}"] .ed-sec__label`,
+              )
+            : null;
+          (row ?? sectionAdd).focus();
+        }
+
+        flushField();
+        railOpen = false;
+        railFor = null;
+        rail.hidden = true;
+        editor.classList.remove('has-rail');
+        // The outline and the pinned chip mean "the panel is showing this one";
+        // with the panel closed they would be saying something untrue.
+        // selectedSection itself stays: it is also where a new section goes.
+        selectInFrame(null);
+      }
+
+      railClose.addEventListener('click', closeRail);
+      rail.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeRail();
+      });
+
+      function railGroup(label: string, children: HTMLElement[]): HTMLElement {
+        const details = document.createElement('details');
+        details.className = 'ed-group';
+        details.open = true;
+
+        const summary = document.createElement('summary');
+        summary.className = 'ed-group__title';
+        summary.textContent = label;
+
+        details.append(summary, ...children);
+        return details;
+      }
+
+      function renderRail(force = false): void {
+        if (!railOpen || !state || !hasList()) {
+          return;
+        }
+
+        // Always by id: a save replaces the page's list with the server's
+        // normalised list, which is new objects.
+        const item = listFor().find((entry) => entry.id === selectedSection);
+
+        if (!item) {
+          // Cancel, not flush: running a pending edit for a section that is
+          // gone would post the whole list again and reload on top of the
+          // delete's own reload.
+          cancelField();
+          closeRail();
+          return;
+        }
+
+        // A rebuild would detach a widget that is mid-upload: its POST still
+        // resolves and still saves, but the merchant watches the field empty out.
+        // pointer-events:none on a busy widget means activeElement may already
+        // have moved out of the panel, so this is checked separately.
+        const busy = !!railFields.querySelector('.ed-image[data-state="busy"]');
+        const typing = railFields.contains(document.activeElement);
+
+        if (
+          railFor === item.id &&
+          railType === item.type &&
+          railLocale === locale &&
+          (busy || (!force && typing))
+        ) {
+          return;
+        }
+
+        const def = typeFor(item.type);
+        const name = sectionName(item);
+        railName.textContent = (def?.label ?? item.type) + (name ? ` — ${name}` : '');
+
+        const fields = def?.fields ?? [];
+        const features = fields.filter((field) => !field.localized);
+        const copy = fields.filter((field) => field.localized);
+        const groups: HTMLElement[] = [];
+
+        if (features.length > 0) {
+          groups.push(railGroup('Settings', features.map((field) => featureField(item, field))));
+        }
+
+        if (copy.length > 0) {
+          if (locale === '') {
+            // Copy saves under a locale; before the frame has reported one the
+            // fields would mark inheritance wrongly and save under nothing.
+            const note = document.createElement('p');
+            note.className = 'ed__note';
+            note.textContent = 'Copy appears once the preview reports its language.';
+            groups.push(note);
+          } else {
+            groups.push(
+              railGroup(
+                'Copy',
+                copy.map((field) =>
+                  renderField({
+                    id: `sec:${item.id}:${field.id}`,
+                    label: field.label,
+                    type: field.type,
+                    options: field.options,
+                  }),
+                ),
+              ),
+            );
+          }
+        }
+
+        railFields.replaceChildren(...groups);
+        railFor = item.id;
+        railType = item.type;
+        railLocale = locale;
+      }
+
+      /** One non-localized setting of one section: a choice, a number, a picture. */
+      function featureField(item: StoredSection, field: SectionField): HTMLElement {
+        const key = `feat:${item.id}:${field.id}`;
+        // The page this field was built for — see renderField's fieldPage. An
+        // upload or a debounced keystroke resolves after the merchant may have
+        // moved on, and a section id only means anything in its own page.
+        const fieldPage = railPage || page.id;
+        const inputId = `feat-${item.id}-${field.id}`;
+        const current = text(item[field.id]) ?? '';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'ed-field';
+        wrap.dataset.field = key;
+
+        const label = document.createElement('label');
+        label.className = 'ed-field__label';
+        label.htmlFor = inputId;
+
+        // A span of its own, so the label is the same flex row a copy field's
+        // is — these values are not localized, so there is no tag beside it.
+        const name = document.createElement('span');
+        name.textContent = field.label;
+        label.append(name);
+        wrap.append(label);
+
+        if (field.type === 'select') {
+          const select = document.createElement('select');
+          select.className = 'ed-input ed-select ed-select--full';
+          select.id = inputId;
+
+          const options = field.options ?? [];
+
+          for (const option of options) {
+            const el = document.createElement('option');
+            el.value = option.value;
+            el.textContent = option.label;
+            select.append(el);
+          }
+
+          // What is stored, else this type's default, else the first choice.
+          select.value = current || field.default || options[0]?.value || '';
+          select.addEventListener('change', () =>
+            setSectionField(fieldPage, item.id, field, select.value),
+          );
+          wrap.append(select);
+          return wrap;
+        }
+
+        if (field.type === 'image') {
+          wrap.append(
+            imageField({
+              id: inputId,
+              value: current,
+              onChange: (url) => setSectionField(fieldPage, item.id, field, url),
+            }),
+          );
+          return wrap;
+        }
+
+        const input = document.createElement('input');
+        input.id = inputId;
+        input.className = 'ed-input';
+
+        if (field.type === 'number') {
+          input.type = 'number';
+          input.min = '1';
+          input.max = '48';
+          input.step = '1';
+        } else {
+          input.classList.add('ed-input--mono');
+          input.spellcheck = false;
+        }
+
+        input.value = current;
+
+        const save = (): void => {
+          const value = input.value.trim();
+          setSectionField(
+            fieldPage,
+            item.id,
+            field,
+            field.type === 'number' && value !== '' ? Number(value) : value,
+          );
+        };
+
+        input.addEventListener('input', () => debounceField(key, save));
+        // Deferred: during blur the next control has not been focused yet, so a
+        // save that runs here would rebuild the panel (renderRail sees no live
+        // field) and detach the element the click or Tab was aimed at.
+        input.addEventListener('blur', () => window.setTimeout(flushField, 0));
+
+        if (field.type === 'number') {
+          // The spinner and a commit-on-blur both land here; either way this
+          // field's pending keystroke is dropped in favour of this one.
+          input.addEventListener('change', () => {
+            cancelField(key);
+            save();
+          });
+        }
+
+        wrap.append(input);
+        return wrap;
+      }
+
+      /** Stores one section setting, then shows the page again with it. */
+      function setSectionField(
+        pageId: string,
+        id: string,
+        field: SectionField,
+        value: string | number,
+      ): void {
+        lastFieldKey = `feat:${id}:${field.id}`;
+
+        const next = listFor(pageId).map((entry) => {
+          if (entry.id !== id) return entry;
+
+          const copy = { ...entry };
+
+          if (value === '') {
+            delete copy[field.id];
+          } else {
+            copy[field.id] = value;
+          }
+
+          return copy;
+        });
+
+        saveSections(next, { page: pageId }); // reloads the frame: the render changed
+      }
+
+      // ---- one pending field edit at a time -----------------------------------
+
+      let fieldTimer = 0;
+      let fieldFlush: (() => void) | null = null;
+      // Which field the pending edit belongs to: another one's keystroke sends
+      // it, the same one's only restarts the clock.
+      let fieldKey = '';
+
+      function debounceField(key: string, run: () => void): void {
+        if (key !== fieldKey) {
+          flushField();
+        }
+
+        window.clearTimeout(fieldTimer);
+        fieldKey = key;
+        fieldFlush = run;
+        fieldTimer = window.setTimeout(flushField, 400);
+      }
+
+      /** Sends the pending edit now. */
+      function flushField(): void {
+        window.clearTimeout(fieldTimer);
+        const run = fieldFlush;
+        fieldFlush = null;
+        fieldKey = '';
+        if (run) run();
+      }
+
+      /**
+       * Drops the pending edit — only this key's, when one is named.
+       *
+       * A field dropping its own keystroke names itself, so it cannot throw
+       * away a different field's pending edit. Called bare, it drops whatever
+       * is pending: the section it belonged to is gone.
+       */
+      function cancelField(key?: string): void {
+        if (key !== undefined && key !== fieldKey) {
+          return;
+        }
+
+        window.clearTimeout(fieldTimer);
+        fieldFlush = null;
+        fieldKey = '';
+      }
+
+      // ---- copy fields, as the old right rail drew them ------------------------
+
+      function renderField(spec: FieldSpec): HTMLElement {
+        const { id } = spec;
+        const wrap = document.createElement('div');
+        wrap.className = 'ed-field';
+        wrap.dataset.field = id;
+
+        const label = document.createElement('label');
+        label.className = 'ed-field__label';
+        label.htmlFor = `copy-${id}`;
+
+        const name = document.createElement('span');
+        name.textContent = spec.label;
+
+        const tag = document.createElement('span');
+        tag.className = 'ed-field__tag';
+
+        label.append(name, tag);
+
+        let input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+
+        if (spec.type === 'long_text') {
+          input = document.createElement('textarea');
+          input.className = 'ed-input ed-input--area';
+          input.rows = 3;
+        } else if (spec.type === 'select') {
+          input = document.createElement('select');
+          input.className = 'ed-input ed-select ed-select--full';
+
+          for (const option of spec.options ?? []) {
+            const el = document.createElement('option');
+            el.value = option.value;
+            el.textContent = option.label;
+            input.append(el);
+          }
+        } else {
+          input = document.createElement('input');
+          input.className = 'ed-input';
+          input.type = spec.type === 'number' ? 'number' : 'text';
+
+          if (spec.type === 'number') {
+            input.min = '1';
+            input.max = '48';
+            input.step = '1';
+          }
+
+          // Links, slugs and URLs: not prose.
+          if (spec.type !== 'text') {
+            input.classList.add('ed-input--mono');
+            input.spellcheck = false;
+          }
+        }
+
+        input.id = `copy-${id}`;
+
+        wrap.append(label, input);
+        fill(wrap, id);
+
+        let committed = input.value;
+        // The page this field was built for. A debounced save resolves after
+        // the merchant may have moved on, and a section id only means anything
+        // inside its own page's list.
+        const fieldPage = railPage || page.id;
+
+        const save = async () => {
+          const value = input.value;
+
+          if (value === committed) {
+            return;
+          }
+
+          // Typing out exactly what it already inherits is not a change.
+          if (stored(id, locale) === undefined && value === resolved(id, locale)) {
+            committed = value;
+            return;
+          }
+
+          committed = value;
+          setStatus('Saving…', 'saving');
+          wrap.classList.remove('is-error');
+
+          try {
+            await postJson('/editor/api/content', { id, locale, value, page: fieldPage });
+            remember(id, locale, value);
+            setStatus('Saved', 'saved');
+            fill(wrap, id);
+            committed = input.value;
+            pushToFrame(id);
+
+            if (sectionRef(id)) {
+              renderSections();
+            }
+          } catch (err) {
+            wrap.classList.add('is-error');
+            setStatus(`Error — ${(err as Error).message}`, 'error');
+          }
+        };
+
+        input.addEventListener('blur', save);
+        input.addEventListener('change', save);
+        input.addEventListener('keydown', (raw) => {
+          const event = raw as KeyboardEvent;
+
+          if (event.key === 'Escape') {
+            // Escape reverts this field; the panel's own Escape handler would
+            // otherwise also close the panel out from under the merchant.
+            event.stopPropagation();
+            input.value = committed;
+            input.blur();
+            return;
+          }
+
+          const enter = event.key === 'Enter';
+          const long = input instanceof HTMLTextAreaElement;
+
+          if (enter && (!long || event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            save();
+          }
+        });
+
+        return wrap;
+      }
+
+      /** Prefills a copy field for the current locale and marks inheritance. */
+      function fill(wrap: HTMLElement, id: string): void {
+        const input = wrap.querySelector<HTMLInputElement | HTMLTextAreaElement>('.ed-input')!;
+        const tag = wrap.querySelector<HTMLElement>('.ed-field__tag')!;
+        const own = stored(id, locale);
+        const localized = targetOf(id)?.localized ?? true;
+
+        input.value = own ?? resolved(id, locale);
+        tag.textContent =
+          own === undefined && localized
+            ? locale === state.defaultLocale
+              ? 'default'
+              : 'inherited'
+            : '';
+      }
+
+      function refreshField(id: string): void {
+        const wrap = railFields.querySelector<HTMLElement>(`[data-field="${CSS.escape(id)}"]`);
+
+        if (wrap) {
+          fill(wrap, id);
+        }
+      }
+
+      // ---- the image widget: a URL, a file picker, a drop target --------------
+
+      function readBase64(picked: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.addEventListener('load', () => {
+            // The API wants bare base64, not the data: URL FileReader gives.
+            const result = String(reader.result);
+            resolve(result.slice(result.indexOf(',') + 1));
+          });
+          reader.addEventListener('error', () => reject(new Error('The file could not be read.')));
+
+          reader.readAsDataURL(picked);
+        });
+      }
+
+      function imageField(options: {
+        /** Goes on the url box: it is the value carrier, and a label's target. */
+        id: string;
+        /** Form name — set in the settings modal, omitted in the section panel. */
+        name?: string;
+        value: string;
+        onChange: (url: string) => void;
+      }): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'ed-image';
+        wrap.dataset.state = 'idle';
+
+        const preview = document.createElement('div');
+        preview.className = 'ed-image__preview';
+        const img = document.createElement('img');
+        img.alt = '';
+        preview.append(img);
+
+        const row = document.createElement('div');
+        row.className = 'ed-image__row';
+
+        const file = document.createElement('input');
+        file.type = 'file';
+        file.className = 'ed-image__file';
+        file.hidden = true;
+        file.accept = 'image/png,image/jpeg,image/gif,image/webp';
+
+        const choose = document.createElement('button');
+        choose.type = 'button';
+        choose.className = 'ed-btn ed-btn--small ed-image__choose';
+        choose.textContent = 'Upload…';
+
+        const clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'ed-btn ed-btn--small ed-image__clear';
+        clear.textContent = 'Clear';
+
+        // fetch reports no upload progress, so this says which of the two
+        // steps is running rather than pretending to a bar.
+        const note = document.createElement('span');
+        note.className = 'ed-image__note';
+        note.setAttribute('role', 'status');
+
+        row.append(file, choose, clear, note);
+
+        const url = document.createElement('input');
+        url.className = 'ed-input ed-input--mono ed-image__url';
+        url.id = options.id;
+        url.placeholder = 'https://… or upload a file';
+        url.spellcheck = false;
+        url.value = options.value;
+
+        // Only in the settings modal: the form reads this box by name.
+        if (options.name) {
+          url.name = options.name;
+        }
+
+        const error = document.createElement('p');
+        error.className = 'ed-image__error';
+        error.setAttribute('role', 'alert');
+
+        wrap.append(preview, row, url, error);
+
+        function showValue(value: string): void {
+          if (value !== '') img.src = value;
+          preview.hidden = value === '';
+          clear.disabled = value === '';
+        }
+
+        showValue(url.value);
+
+        choose.addEventListener('click', () => file.click());
+
+        file.addEventListener('change', () => {
+          const picked = file.files?.[0];
+          // Cleared, so picking the same file twice in a row still counts.
+          file.value = '';
+          if (picked) upload(picked);
+        });
+
+        clear.addEventListener('click', () => {
+          // showValue('') disables this button, and disabling the focused element
+          // drops focus to <body> — which would let the next save rebuild the
+          // whole panel. Upload sits beside it and stays enabled.
+          choose.focus();
+          // This widget's own pending URL edit, which would write the value back;
+          // another field's pending edit is none of its business.
+          cancelField(`img:${options.id}`);
+          url.value = '';
+          error.textContent = '';
+          showValue('');
+          options.onChange('');
+        });
+
+        url.addEventListener('input', () => {
+          clear.disabled = url.value === '';
+          debounceField(`img:${options.id}`, () => {
+            showValue(url.value);
+            options.onChange(url.value);
+          });
+        });
+        // Deferred, as the feature fields' is: see featureField.
+        url.addEventListener('blur', () => window.setTimeout(flushField, 0));
+
+        wrap.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          wrap.classList.add('is-over');
+        });
+        wrap.addEventListener('dragleave', () => wrap.classList.remove('is-over'));
+        wrap.addEventListener('drop', (event) => {
+          event.preventDefault();
+          wrap.classList.remove('is-over');
+
+          const dropped = event.dataTransfer?.files[0];
+          if (dropped) upload(dropped);
+        });
+
+        async function upload(picked: File): Promise<void> {
+          error.textContent = '';
+
+          // Refused here, before a byte goes out. Mirrors MAX_UPLOAD_BYTES in
+          // lib/editor.ts, which is the check that actually protects the API.
+          if (picked.size > MAX_UPLOAD_BYTES) {
+            error.textContent = 'Larger than 5 MB — use a smaller image.';
+            return;
+          }
+
+          if (!/^image\/(png|jpeg|gif|webp)$/.test(picked.type)) {
+            error.textContent = 'PNG, JPEG, GIF or WebP only.';
+            return;
+          }
+
+          wrap.dataset.state = 'busy';
+          choose.disabled = true;
+          clear.disabled = true;
+          note.textContent = 'Reading…';
+
+          try {
+            const data = await readBase64(picked);
+            note.textContent = 'Uploading…';
+
+            const res = await postJson('/editor/api/upload', { data, filename: picked.name });
+
+            url.value = String(res.url);
+            showValue(url.value);
+            options.onChange(url.value);
+          } catch (err) {
+            error.textContent = (err as Error).message;
+          } finally {
+            note.textContent = '';
+            wrap.dataset.state = 'idle';
+            choose.disabled = false;
+            clear.disabled = url.value === '';
+          }
+        }
+
+        return wrap;
+      }
+
+      // A file dropped anywhere the widgets above do not handle would be opened
+      // by the browser, replacing this whole editor — the open panel, the
+      // selection and any pending edit go with it. Near misses are likely now
+      // that dropping a picture on a widget is a thing the editor invites.
+      //
+      // Only file drags: a row reorder and a text drag into an input have their
+      // own defaults, and cancelling those would break both.
+      function refuseStrayFile(event: DragEvent): void {
+        const types = event.dataTransfer?.types;
+
+        if (!types || !Array.from(types).includes('Files')) {
+          return;
+        }
+
+        if ((event.target as Element | null)?.closest?.('.ed-image')) {
+          return;
+        }
+
+        event.preventDefault();
+      }
+
+      window.addEventListener('dragover', refuseStrayFile);
+      window.addEventListener('drop', refuseStrayFile);
+
+      // ---- top bar -------------------------------------------------------------
+
+      function setPreviewWidth(width: PreviewWidth): void {
+        canvas.dataset.width = width;
+        widthButtons.forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.width === width));
+        });
+
+        try {
+          localStorage.setItem(WIDTH_KEY, width);
+        } catch {
+          // Private mode or blocked storage: the choice just is not remembered.
+        }
+      }
+
+      widthButtons.forEach((button) => {
+        button.addEventListener('click', () => setPreviewWidth(button.dataset.width as PreviewWidth));
+      });
+
+      reloadButton.addEventListener('click', () => {
+        // A manual reload is a request for what is saved now.
+        loadFrame(page.url, true);
+      });
+
+      frame.addEventListener('load', () => {
+        canvas.removeAttribute('aria-busy');
+
+        if (statusEl.dataset.kind === 'saving') {
+          setStatus('');
+        }
+      });
+
+      // ---- boot ------------------------------------------------------------------
+
+      async function boot(): Promise<void> {
+        try {
+          const saved = localStorage.getItem(WIDTH_KEY);
+          if (saved === 'tablet' || saved === 'mobile') setPreviewWidth(saved);
+        } catch {
+          // Not remembered; desktop it is.
+        }
+
+        // The home page render is the slow part of opening the editor, so it
+        // starts now, alongside the state call, rather than after it.
+        loadFrame('/');
+
+        let res: Response;
+
+        try {
+          res = await fetch('/editor/api/state', {
+            credentials: 'same-origin',
+            headers: { accept: 'application/json' },
+          });
+        } catch (err) {
+          fail(`The editor could not load: ${(err as Error).message}`);
+          return;
+        }
+
+        // The editor is gated on the dashboard session. A 404 means it is no
+        // longer accepted, and the middleware sends an unauthorized request to
+        // the storefront, so reloading lands the merchant somewhere real.
+        if (res.status === 404) {
+          window.location.reload();
+          return;
+        }
+
+        if (!res.ok) {
+          fail(`The editor could not load (HTTP ${res.status}).`);
+          return;
+        }
+
+        state = await res.json();
+
+        // Every page with a list, not just the one that opens: a save that
+        // fails before one has succeeded on that page rolls back to what
+        // loaded, and a page with a required section has no empty state to
+        // fall back on — an empty list is one the server refuses for good.
+        for (const id of Object.keys(state.sections.lists)) {
+          savedSections[id] = listFor(id);
+        }
+
+        renderPages();
+        renderSettings();
+        renderPicker();
+        settingsOpen.disabled = false;
+        backButton.disabled = false;
+
+        if (state.warnings.length > 0) {
+          setStatus(state.warnings.join(' '), 'error');
+        }
+
+        // Already loading since the top of boot(); only the nav catches up.
+        show(state.pages[0], false);
+      }
+
+      function fail(text: string): void {
+        pageName.textContent = 'Editor';
+        panelTitle.textContent = 'Editor';
+        setStatus(text, 'error');
+      }
+
+      boot();
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  /* The storefront's tokens, on their defaults. The editor is the app's own
+     surface and stays on the house palette; the merchant's palette is what
+     the frame shows. Values mirror layouts/Layout.astro. */
+  :root {
+    --color-primary: #f0f0f0;
+    --color-secondary: #0f0f0f;
+    --color-text: #f0f0f0;
+    --color-muted: #9e9e9e;
+    --color-background: #0f0f0f;
+    --color-surface: #181818;
+    --color-border: #3f3f3f;
+    /* Lighter than the surface so the frame's edge reads against it. */
+    --color-canvas: #242424;
+
+    color-scheme: dark;
+
+    --font-sans:
+      'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
+      Arial, sans-serif;
+    --font-mono:
+      'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --text-chrome: 0.6875rem;
+    --text-nav: 0.8125rem;
+    --text-meta: 0.75rem;
+    --text-body: 0.875rem;
+
+    --track-chrome: 0.14em;
+    --track-wide: 0.05em;
+
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --dur-ui: 150ms;
+
+    --nav-w: 300px;
+    --rail-w: 320px;
+    --bar-h: 56px;
+    --canvas-pad: 1.25rem;
+    --preview-tablet: 768px;
+    --preview-mobile: 390px;
+    --modal-w: 520px;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.5;
+    letter-spacing: var(--track-wide);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  h1,
+  h2,
+  p {
+    margin: 0;
+    font-weight: 500;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-secondary);
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  /* Frame ----------------------------------------------------------------- */
+
+  /* Two columns: nav | stage — three while one section's settings are open,
+     so closing the panel gives the stage its width back. */
+  .ed {
+    display: grid;
+    grid-template-columns: var(--nav-w) minmax(0, 1fr);
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .ed.has-rail {
+    grid-template-columns: var(--nav-w) minmax(0, 1fr) var(--rail-w);
+  }
+
+  .ed__rail {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--color-surface);
+    border-left: 1px solid var(--color-border);
+    padding: 1.25rem 1.25rem 3rem;
+  }
+
+  .ed__rail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .ed__rail-head .ed__heading {
+    margin: 0;
+  }
+
+  .ed__rail-close {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-body);
+    line-height: 1;
+    cursor: pointer;
+    transition: color var(--dur-ui) var(--ease);
+  }
+
+  .ed__rail-close:hover {
+    color: var(--color-text);
+  }
+
+  /* The same 1108px the tablet width needs: narrower than that a third column
+     would leave the preview unusable, so the nav gives up 60px and the panel
+     overlays the stage. `display: none` here would put section settings out
+     of reach on a laptop. With the panel closed nothing below changes. */
+  @media (max-width: 1107px) {
+    .ed.has-rail {
+      --nav-w: 240px;
+      /* The rail is out of flow here, so the track it would sit in has to go
+         with it: left in, it would hold 320px of empty stage open. */
+      grid-template-columns: var(--nav-w) minmax(0, 1fr);
+    }
+
+    .ed.has-rail .ed__rail {
+      position: fixed;
+      inset: 0 0 0 auto;
+      width: min(var(--rail-w), 100vw);
+      z-index: 5;
+      box-shadow: -1px 0 0 var(--color-border);
+    }
+  }
+
+  .ed__nav {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+  }
+
+  .ed__stage {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* Title and status | width group | tools. The tools never get less than
+     their content, so the width group is centred whenever there is room and
+     shifts left, rather than the tools wrapping, when there is not. */
+  .ed__bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+    align-items: center;
+    gap: 1rem;
+    min-height: var(--bar-h);
+    padding: 0 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .ed__lead {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .ed__canvas {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    padding: var(--canvas-pad);
+    background: var(--color-canvas);
+    overflow: hidden;
+  }
+
+  /* No frame line, not even a shadow, so the page's viewport is the
+     labelled width exactly: a border would leave a 768px tablet at 766px,
+     under the storefront's 767px breakpoint. The desktop fallback is a
+     length so every width change animates, not only tablet <-> mobile. */
+  .ed__frame {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    max-width: var(--preview-w, 100%);
+    height: 100%;
+    border: 0;
+    background: var(--color-canvas);
+    transition:
+      max-width var(--dur-ui) var(--ease),
+      opacity var(--dur-ui) var(--ease);
+  }
+
+  .ed__canvas[data-width='tablet'] {
+    --preview-w: var(--preview-tablet);
+  }
+
+  .ed__canvas[data-width='mobile'] {
+    --preview-w: var(--preview-mobile);
+  }
+
+  .ed__canvas[aria-busy='true'] .ed__frame {
+    opacity: 0.5;
+  }
+
+  /* Tablet needs --nav-w + 2 x --canvas-pad + --preview-tablet = 1108px of
+     shell; narrower than that it would equal Desktop, so it is not offered. */
+  @media (max-width: 1107px) {
+    .ed__width[data-width='tablet'] {
+      display: none;
+    }
+  }
+
+  /* Narrow shells: the width group takes a row of its own under the title
+     and tools instead of competing with them for one. */
+  @media (max-width: 900px) {
+    .ed__bar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      row-gap: 0.5rem;
+      padding-block: 0.75rem;
+    }
+
+    .ed__lead {
+      grid-row: 1;
+      grid-column: 1;
+    }
+
+    .ed__tools {
+      grid-row: 1;
+      grid-column: 2;
+    }
+
+    .ed__widths {
+      grid-row: 2;
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+  }
+
+  /* Type ------------------------------------------------------------------ */
+
+  .ed__brand {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    min-height: var(--bar-h);
+    padding: 0 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+    font-family: var(--font-mono);
+    font-size: var(--text-nav);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    align-items: center;
+  }
+
+  .ed__muted,
+  .ed__note,
+  .ed-field__hint {
+    color: var(--color-muted);
+  }
+
+  .ed__heading,
+  .ed-field__label,
+  .ed-group__title {
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .ed__page {
+    flex: none;
+    max-width: 60%;
+    font-size: var(--text-body);
+    font-weight: 500;
+    letter-spacing: var(--track-wide);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ed__panel-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .ed__back {
+    flex: none;
+    min-height: 32px;
+    padding: 0 0.5rem;
+    margin-left: -0.5rem;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color var(--dur-ui) var(--ease);
+  }
+
+  .ed__back:hover {
+    color: var(--color-text);
+  }
+
+  .ed__back[disabled] {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .ed__panel-title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-body);
+    font-weight: 500;
+    letter-spacing: var(--track-wide);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ed__empty {
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    line-height: 1.45;
+  }
+
+  .ed__empty-title {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-text);
+  }
+
+  .ed__note {
+    margin: 0.5rem 0 1rem;
+    font-size: var(--text-meta);
+  }
+
+  /* Pages ----------------------------------------------------------------- */
+
+  .ed__pages,
+  .ed__panel {
+    padding: 1.25rem;
+  }
+
+  .ed__heading {
+    margin-bottom: 0.75rem;
+  }
+
+  /* The heading and its ⓘ share the heading's own bottom margin. */
+  .ed__heading-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .ed__heading-row .ed__heading {
+    margin-bottom: 0;
+  }
+
+  .ed__info {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    line-height: 1;
+    cursor: pointer;
+    transition: color var(--dur-ui) var(--ease);
+  }
+
+  .ed__info:hover,
+  .ed__info:focus-visible {
+    color: var(--color-text);
+  }
+
+  .ed__help {
+    margin: 0 0 1rem;
+    padding: 0.625rem 0.75rem;
+    border-left: 2px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    line-height: 1.45;
+  }
+
+  /* Announced, never drawn: the live region for a keyboard reorder. */
+  .ed__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .ed__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ed__link {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    padding: 0 0.75rem;
+    margin: 0 -0.75rem;
+    width: calc(100% + 1.5rem);
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-nav);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      color var(--dur-ui) var(--ease),
+      background-color var(--dur-ui) var(--ease);
+  }
+
+  .ed__link:hover {
+    color: var(--color-text);
+  }
+
+  .ed__link[aria-current='page'] {
+    color: var(--color-secondary);
+    background: var(--color-primary);
+  }
+
+  /* Controls -------------------------------------------------------------- */
+
+  .ed__tools {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: flex-end;
+  }
+
+  .ed__status {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .ed__status[data-kind='error'] {
+    color: var(--color-text);
+    text-transform: none;
+    letter-spacing: var(--track-wide);
+    max-width: 32rem;
+  }
+
+  .ed__widths {
+    display: flex;
+    border: 1px solid var(--color-border);
+  }
+
+  .ed__width {
+    min-height: 32px;
+    padding: 0 0.75rem;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-ui) var(--ease),
+      color var(--dur-ui) var(--ease);
+  }
+
+  .ed__width + .ed__width {
+    border-left: 1px solid var(--color-border);
+  }
+
+  .ed__width:hover {
+    color: var(--color-text);
+  }
+
+  .ed__width[aria-pressed='true'] {
+    background: var(--color-primary);
+    color: var(--color-secondary);
+  }
+
+  .ed-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 1.25rem;
+    border: 1px solid var(--color-primary);
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-ui) var(--ease),
+      color var(--dur-ui) var(--ease);
+  }
+
+  .ed-btn:hover {
+    background: var(--color-primary);
+    color: var(--color-secondary);
+  }
+
+  .ed-btn--primary {
+    background: var(--color-primary);
+    color: var(--color-secondary);
+  }
+
+  .ed-btn--primary:hover {
+    background: var(--color-surface);
+    color: var(--color-primary);
+  }
+
+  .ed-btn--small {
+    min-height: 32px;
+    padding: 0 0.75rem;
+  }
+
+  .ed-btn[disabled] {
+    border-color: var(--color-border);
+    background: var(--color-border);
+    color: var(--color-muted);
+    cursor: wait;
+  }
+
+  .ed-input,
+  .ed-select {
+    width: 100%;
+    min-height: 36px;
+    padding: 0 0.625rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 65%, var(--color-text));
+    border-radius: 0;
+    background: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    letter-spacing: 0.01em;
+    transition: border-color var(--dur-ui) var(--ease);
+  }
+
+  .ed-input:hover,
+  .ed-select:hover {
+    border-color: var(--color-muted);
+  }
+
+  .ed-input:focus,
+  .ed-select:focus {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+
+  .ed-input--mono {
+    font-family: var(--font-mono);
+  }
+
+  .ed-input--area {
+    min-height: 4.5rem;
+    padding: 0.5rem 0.625rem;
+    line-height: 1.45;
+    resize: vertical;
+  }
+
+  .ed-select {
+    width: auto;
+    padding-right: 2rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239e9e9e' stroke-width='1.2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 10px 6px;
+    cursor: pointer;
+  }
+
+  .ed-select[disabled] {
+    cursor: default;
+    color: var(--color-muted);
+  }
+
+  .ed-select--full {
+    width: 100%;
+  }
+
+  /* Fields ---------------------------------------------------------------- */
+
+  .ed-field {
+    margin-bottom: 1rem;
+  }
+
+  /* A flex row so a copy field's inheritance tag sits at its far end; a
+     label that is one span still reads left-aligned. */
+  .ed-field__label {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .ed-field__tag {
+    font-weight: 400;
+    opacity: 0.7;
+  }
+
+  .ed-field__tag:empty {
+    display: none;
+  }
+
+  .ed-field__hint {
+    margin-top: 0.375rem;
+    font-size: var(--text-meta);
+    line-height: 1.45;
+  }
+
+  .ed-field.is-error .ed-input {
+    border-color: var(--color-text);
+  }
+
+  .ed-field--toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .ed-field--toggle .ed-field__label {
+    margin: 0;
+  }
+
+  .ed-field--toggle input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--color-primary);
+  }
+
+  .ed-color {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .ed-swatch {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--color-border) 65%, var(--color-text));
+    border-radius: 0;
+    background: var(--color-background);
+    cursor: pointer;
+  }
+
+  .ed-swatch::-webkit-color-swatch-wrapper {
+    padding: 3px;
+  }
+
+  .ed-swatch::-webkit-color-swatch {
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* Groups ---------------------------------------------------------------- */
+
+  .ed-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .ed-group__title {
+    padding: 0.5rem 0;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .ed-group__title::-webkit-details-marker {
+    display: none;
+  }
+
+  .ed-group__title::before {
+    content: '\25B8';
+    display: inline-block;
+    width: 1.25em;
+    letter-spacing: 0;
+    transition: transform var(--dur-ui) var(--ease);
+  }
+
+  .ed-group[open] > .ed-group__title::before {
+    transform: rotate(90deg);
+  }
+
+  /* Image field ----------------------------------------------------------- */
+
+  .ed-image__preview img {
+    display: block;
+    width: 100%;
+    max-height: 120px;
+    object-fit: contain;
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+  }
+
+  .ed-image__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+  }
+
+  .ed-image__note {
+    font-size: var(--text-meta);
+    color: var(--color-muted);
+  }
+
+  .ed-image__error {
+    margin-top: 0.375rem;
+    font-size: var(--text-meta);
+    color: var(--color-text);
+  }
+
+  .ed-image__error:empty {
+    display: none;
+  }
+
+  .ed-image.is-over {
+    outline: 1px dashed var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* Nothing is clickable while the file is on its way: a rebuild under a
+     live upload would empty the field the merchant is watching. */
+  .ed-image[data-state='busy'] {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  /* Settings dialog ------------------------------------------------------- */
+
+  .ed-modal {
+    width: min(var(--modal-w), calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  /* The dialog is the flex container and the form shrinks inside it, so the
+     body is the only thing that scrolls; a form given the dialog's max-height
+     outgrows its content box by the border and scrolls the whole modal. */
+  .ed-modal[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --color-background, written out: ::backdrop inherits custom properties
+     only in recent engines, and an unresolvable var() drops the dim entirely. */
+  .ed-modal::backdrop {
+    background: rgb(15 15 15 / 0.7);
+  }
+
+  .ed-modal__form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .ed-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--bar-h);
+    padding: 0 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .ed-modal__head .ed__heading {
+    margin: 0;
+  }
+
+  .ed-modal__close {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-body);
+    line-height: 1;
+    cursor: pointer;
+    transition: color var(--dur-ui) var(--ease);
+  }
+
+  .ed-modal__close:hover {
+    color: var(--color-text);
+  }
+
+  /* Sits between the dialog's head and its body, so the strip stays put while
+     the fields under it scroll. */
+  .ed-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .ed-tab {
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: none;
+    color: var(--color-muted);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition:
+      color var(--dur-ui, 150ms) var(--ease, ease),
+      border-color var(--dur-ui, 150ms) var(--ease, ease);
+  }
+
+  .ed-tab:hover {
+    color: var(--color-text);
+  }
+
+  .ed-tab[aria-selected='true'] {
+    color: var(--color-text);
+    border-bottom-color: var(--color-primary);
+  }
+
+  .ed-modal__body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1.25rem 1.25rem 0.25rem;
+  }
+
+  .ed-modal__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  #settings-cancel,
+  #delete-cancel {
+    margin-left: auto;
+  }
+
+  .ed__dirty {
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .ed-modal__error {
+    font-size: var(--text-meta);
+    color: var(--color-text);
+  }
+
+  /* Hidden from sight, not from the tree: an alert region that leaves the
+     accessibility tree while empty is not reliably announced when it fills.
+     Out of flow, so it adds no gap to the footer either. */
+  .ed-modal__error:empty {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .ed-modal--confirm {
+    --modal-w: 420px;
+  }
+
+  .ed-modal__text {
+    margin: 0 0 0.5rem;
+    font-size: var(--text-body);
+    line-height: 1.5;
+  }
+
+  /* Sections ---------------------------------------------------------- */
+
+  .ed-seclist {
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+  }
+
+  .ed-seclist:empty::after {
+    content: 'No sections — add one below.';
+    display: block;
+    padding: 0.75rem 0;
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+  }
+
+  .ed-sec {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+    border: 1px solid transparent;
+    border-top-color: var(--color-border);
+    transition:
+      background-color var(--dur-ui) var(--ease),
+      border-color var(--dur-ui) var(--ease),
+      opacity var(--dur-ui) var(--ease);
+  }
+  .ed-sec {
+    /* A press on a row must never turn into a text selection. */
+    user-select: none;
+  }
+
+  .ed-sec:last-child {
+    border-bottom-color: var(--color-border);
+  }
+
+  .ed-sec:hover,
+  .ed-sec.is-hover {
+    background: var(--color-background);
+  }
+
+  .ed-sec.is-selected {
+    border-color: var(--color-primary);
+  }
+
+  .ed-sec.is-dragging {
+    opacity: 0.4;
+  }
+
+  /* Only the name dims: the type line carries the " · hidden" suffix and has
+     to stay legible, so it keeps its full muted colour. */
+  .ed-sec.is-hidden .ed-sec__name {
+    opacity: 0.6;
+  }
+
+  .ed-sec.is-hidden .ed-sec__type::after {
+    content: ' · hidden';
+  }
+
+  /* The drop line, inset so nothing shifts while it is shown. */
+  .ed-sec.is-over-before {
+    box-shadow: inset 0 2px 0 var(--color-primary);
+  }
+
+  .ed-sec.is-over-after {
+    box-shadow: inset 0 -2px 0 var(--color-primary);
+  }
+
+  .ed-sec__handle {
+    flex: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .ed-sec.is-dragging .ed-sec__handle {
+    cursor: grabbing;
+  }
+
+  .ed-sec__label {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .ed-sec__type {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .ed-sec__name {
+    display: block;
+    overflow: hidden;
+    font-size: var(--text-meta);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .ed-sec__name:empty {
+    display: none;
+  }
+
+  .ed-sec__tools {
+    display: flex;
+    flex: none;
+    gap: 0.125rem;
+  }
+
+  .ed-sec__btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-body);
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      color var(--dur-ui) var(--ease),
+      background-color var(--dur-ui) var(--ease);
+  }
+
+  .ed-sec__btn:hover {
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .ed-sec__btn[disabled] {
+    opacity: 0.3;
+    cursor: default;
+    background: none;
+    color: var(--color-muted);
+  }
+
+  .ed-sec__btn[aria-pressed='true'] {
+    color: var(--color-primary);
+  }
+
+  .ed-sec__btn svg {
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  .ed-picker {
+    display: grid;
+    gap: 0.375rem;
+    margin-top: 0.75rem;
+  }
+
+  .ed-picker__item {
+    display: block;
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-background);
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--dur-ui) var(--ease);
+  }
+
+  .ed-picker__item:hover {
+    border-color: var(--color-primary);
+  }
+
+  .ed-picker__type {
+    display: block;
+    margin-bottom: 0.125rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-chrome);
+    font-weight: 500;
+    letter-spacing: var(--track-chrome);
+    text-transform: uppercase;
+  }
+
+  .ed-picker__desc {
+    display: block;
+    font-size: var(--text-meta);
+    line-height: 1.45;
+    color: var(--color-muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>

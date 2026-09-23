@@ -1,0 +1,39 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * A wide picture with a heading, a line and a button laid over it. The
+ * picture is decorative — the copy on top carries the meaning — and with no
+ * picture saved the copy sits on the surface tint alone. Empty lines are
+ * left out of a shopper's page; in edit mode they stay, empty, so copy typed
+ * into the editor's rail shows up without a reload.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+---
+
+<section class="sec sec--image-banner" data-section={section.id} data-section-type="image_banner">
+  <div class="sec__media sec__media--wide">
+    {section.image && <img src={section.image} alt="" loading="lazy" />}
+
+    <div class="sec__overlay">
+      {(section.eyebrow || editMode) && (
+        <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+      )}
+      <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+      {(section.body || editMode) && (
+        <p class="lede"><T id={`sec:${section.id}:body`} value={section.body} /></p>
+      )}
+      {(section.cta_label || editMode) && (
+        <a class="btn btn--primary" href={section.cta_url || '/'}>
+          <T id={`sec:${section.id}:cta_label`} value={section.cta_label} />
+        </a>
+      )}
+    </div>
+  </div>
+</section>

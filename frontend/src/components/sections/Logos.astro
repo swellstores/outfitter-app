@@ -1,0 +1,44 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * A line and up to four names or marks of the teams that wear you. A slot
+ * with neither a name nor a picture is left out of a shopper's page; in edit
+ * mode every slot stays so a name typed into the editor's rail shows up
+ * without a reload. Outside edit mode a picture stands in for its name; in
+ * edit mode both show so the name stays editable.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+
+const marks = [
+  { slot: 'a', title: section.title_a, image: section.image_a },
+  { slot: 'b', title: section.title_b, image: section.image_b },
+  { slot: 'c', title: section.title_c, image: section.image_c },
+  { slot: 'd', title: section.title_d, image: section.image_d },
+];
+---
+
+<section class="sec sec--logos" data-section={section.id} data-section-type="logos">
+  <h2 class="eyebrow"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+  <ul class="sec__logos">
+    {
+      marks.map(
+        ({ slot, title, image }) =>
+          (title || image || editMode) && (
+            <li class:list={['sec__logo', image && !editMode && 'sec__logo--img']}>
+              {image && <img src={image} alt={editMode ? '' : title} loading="lazy" />}
+              <span class="sec__logo-name">
+                <T id={`sec:${section.id}:title_${slot}`} value={title} />
+              </span>
+            </li>
+          ),
+      )
+    }
+  </ul>
+</section>

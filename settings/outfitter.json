@@ -1,0 +1,110 @@
+{
+  "label": "Outfitter",
+  "description": "Storefront settings: the store name and logo in the header, the palette every page is drawn with, and how long a rendered page is served from the edge. The store's own copy is in the Content panel, and the sections each page is built from are in Sections and in /editor.",
+  "fields": [
+    {
+      "id": "store_name",
+      "label": "Store name",
+      "type": "short_text",
+      "admin_span": 2,
+      "description": "Shown in the header and page titles. Leave empty to use the store name from Settings → General."
+    },
+    {
+      "id": "logo",
+      "label": "Logo",
+      "type": "image",
+      "admin_span": 2,
+      "description": "Replaces the store name in the header. A transparent PNG or SVG works best — the header sits over the page with no background of its own."
+    },
+    {
+      "type": "field_row",
+      "fields": [
+        {
+          "id": "color_primary",
+          "label": "Primary",
+          "type": "color",
+          "default": "#F0F0F0",
+          "admin_span": 1,
+          "description": "Buttons, active links and focus outlines.",
+          "fallback": false
+        },
+        {
+          "id": "color_secondary",
+          "label": "Secondary (on primary)",
+          "type": "color",
+          "default": "#0F0F0F",
+          "admin_span": 1,
+          "description": "Sits on top of Primary — button labels and inverted sections. Keep it high contrast.",
+          "fallback": false
+        },
+        {
+          "id": "color_text",
+          "label": "Text",
+          "type": "color",
+          "default": "#F0F0F0",
+          "admin_span": 1,
+          "description": "Headings and body copy.",
+          "fallback": false
+        },
+        {
+          "id": "color_muted",
+          "label": "Muted text",
+          "type": "color",
+          "default": "#9E9E9E",
+          "admin_span": 1,
+          "description": "Prices, captions and product details. Keep it readable on Background.",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "type": "field_row",
+      "fields": [
+        {
+          "id": "color_background",
+          "label": "Background",
+          "type": "color",
+          "default": "#0F0F0F",
+          "admin_span": 1,
+          "description": "The page behind everything.",
+          "fallback": false
+        },
+        {
+          "id": "color_surface",
+          "label": "Surface",
+          "type": "color",
+          "default": "#181818",
+          "admin_span": 1,
+          "description": "Product image backdrops and quiet blocks.",
+          "fallback": false
+        },
+        {
+          "id": "color_border",
+          "label": "Border",
+          "type": "color",
+          "default": "#3F3F3F",
+          "admin_span": 1,
+          "description": "Hairlines between rows. Input edges are drawn a step stronger automatically.",
+          "fallback": false
+        }
+      ]
+    },
+    {
+      "id": "cache_ttl",
+      "label": "Page cache (seconds)",
+      "type": "number",
+      "default": 60,
+      "admin_span": 2,
+      "description": "How long a rendered page is served from the edge before it is refreshed in the background. Shoppers never wait on the refresh, so product and price changes show up within this many seconds. 0 turns caching off.",
+      "fallback": false
+    },
+    {
+      "id": "demo_mode",
+      "label": "Demo store",
+      "type": "toggle",
+      "default": false,
+      "description": "Says plainly, in the footer and on every product, that this store is a demonstration and nothing ordered will be made or shipped. Turn it on for a sample store; leave it off for one that takes real orders.",
+      "fallback": false
+    }
+  ]
+}

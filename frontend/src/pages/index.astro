@@ -1,0 +1,12 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import Sections from '@/components/sections/Sections.astro';
+
+const { t } = Astro.locals;
+---
+
+<Layout description={t('home_meta_description')} flush>
+  <div class="container">
+    <Sections page="home" />
+  </div>
+</Layout>

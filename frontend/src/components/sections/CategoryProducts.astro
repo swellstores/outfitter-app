@@ -1,0 +1,75 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import ProductCard from '@/components/ProductCard.astro';
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * A category: its name, its description, and the products in it. The category
+ * page's required section — it is what that page is for, so it cannot be
+ * hidden or deleted, though a merchant may put other sections around it.
+ *
+ * The category arrives as a prop: the page has already read it for its title,
+ * its meta description and its 404 status, and a second read would be another
+ * round trip through the proxy. The products are read here, where they are the
+ * only thing that wants them.
+ */
+interface Props {
+  section: Section;
+  record: SwellData;
+}
+
+const { section, record: category } = Astro.props;
+const { swell } = Astro.locals;
+
+const list = await swell.storefront.products
+  .list({ category: category.slug || category.id, limit: 24 })
+  .catch(() => null);
+
+const products: SwellData[] = list?.results ?? [];
+---
+
+{/* One element, because a section is one box: the editor outlines it and drag
+    and drop moves it. It carries no styling of its own, so the page reads as
+    it did when this markup sat directly in the container. */}
+<div
+  data-section={section.id}
+  data-section-type="category_products"
+  data-section-required
+>
+  <header class="page-head">
+    <p class="eyebrow"><T id="category_eyebrow" /></p>
+    <h1 class="display">{category.name}</h1>
+    {category.description && (
+      <div class="prose" set:html={category.description} />
+    )}
+  </header>
+
+  <div class="section__head">
+    <h2 class="section__title"><T id="category_all_title" /></h2>
+    {products.length > 0 && (
+      <p class="meta">
+        {products.length} {products.length === 1 ? <T id="category_count_one" /> : <T id="category_count_other" />}
+      </p>
+    )}
+  </div>
+
+  {products.length > 0 ? (
+    <div class="grid">
+      {products.map((product: SwellData) => (
+        <ProductCard product={product} />
+      ))}
+    </div>
+  ) : (
+    <div class="empty empty--bare">
+      <h3 class="subtitle"><T id="category_empty_title" /></h3>
+      <p class="lede">
+        <T id="category_empty_body" />
+      </p>
+      <a class="btn" href="/">
+        <T id="category_empty_browse" />
+      </a>
+    </div>
+  )}
+</div>

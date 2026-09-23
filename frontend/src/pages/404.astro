@@ -1,0 +1,19 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import T from '@/components/T.astro';
+
+const { t } = Astro.locals;
+---
+
+<Layout title={t('not_found_title')}>
+  <div class="container">
+    <div class="empty empty--bare">
+      <p class="eyebrow"><T id="not_found_eyebrow" /></p>
+      <h1 class="display"><T id="not_found_title" /></h1>
+      <p class="lede">
+        <T id="not_found_body" />
+      </p>
+      <a class="btn" href="/"><T id="not_found_back" /></a>
+    </div>
+  </div>
+</Layout>

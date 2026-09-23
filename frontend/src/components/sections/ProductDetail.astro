@@ -1,0 +1,402 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import { tenantKey } from '@/swell';
+import ProductCard from '@/components/ProductCard.astro';
+import T from '@/components/T.astro';
+import { getAppSettings } from '@/lib/app-settings';
+import { formatMoney } from '@/lib/format';
+import { optionPrice, productOptions } from '@/lib/product-options';
+import type { Section } from '@/lib/sections';
+
+/**
+ * The product itself: images, price, options and add to cart. The product
+ * page's required section — it is what that page is for, so it cannot be
+ * hidden or deleted, though a merchant may put other sections around it.
+ *
+ * The record arrives as a prop rather than being fetched here: the page has
+ * already read it for its title, its meta description and its 404 status, and
+ * a second read would be another round trip through the proxy.
+ */
+interface Props {
+  section: Section;
+  record: SwellData;
+}
+
+const { section, record: product } = Astro.props;
+const { swell, t } = Astro.locals;
+const { currency, locale } = swell.getStorefrontLocalization();
+// Memoised per store and already read this request by resolve-copy, so this
+// is a map lookup rather than a round trip.
+const app = await getAppSettings(swell, tenantKey(Astro));
+const images: SwellData[] = (product.images ?? []).slice(0, 4);
+
+// Every option the shopper answers, variant and not: a size, a thread colour,
+// a name to print. The variant is resolved by the API from the values posted,
+// so this page never picks one — see lib/product-options.ts.
+const options = productOptions(product);
+
+// What the dashboard calls this product's related products: its up-sells, in
+// the merchant's own order. Swell has no related-products endpoint — up_sells
+// is the link, expanded by the page's read — so a product with none configured
+// simply has no block here.
+const recommended: SwellData[] = (product.up_sells ?? [])
+  .map((entry: SwellData) => entry.product)
+  .filter(Boolean)
+  .slice(0, 4);
+
+const onSale = Boolean(product.sale) && Number(product.orig_price) > 0;
+const soldOut =
+  product.stock_status === 'out_of_stock' && !product.stock_purchasable;
+---
+
+<div
+  class="pdp"
+  data-section={section.id}
+  data-section-type="product_detail"
+  data-section-required
+>
+  <div class="pdp__media" data-pdp-media>
+    {images.length > 0 ? (
+      images.map((image: SwellData, index: number) => (
+        <figure class="figure">
+          <img
+            src={image.file?.url}
+            alt={index === 0 ? product.name : ''}
+            loading={index === 0 ? 'eager' : 'lazy'}
+          />
+        </figure>
+      ))
+    ) : (
+      <div class="figure" />
+    )}
+  </div>
+
+  <div class="pdp__info">
+    <h1 class="title">{product.name}</h1>
+
+    {app.demo_mode === true && (
+      <p class="pdp__demo"><T id="demo_product_notice" /></p>
+    )}
+
+    <p class="pdp__price">
+      {onSale && <s>{formatMoney(product.orig_price, currency, locale)}</s>}
+      {formatMoney(product.price, currency, locale)}
+    </p>
+
+    {/* data-* carries what the drawer shows before the server answers.
+        Without JS this is an ordinary post that lands on /cart. */}
+    <form
+      class="pdp__form"
+      method="post"
+      action="/cart"
+      data-cart-form
+      data-name={product.name}
+      data-slug={product.slug}
+      data-image={images[0]?.file?.url}
+      data-price={product.price}
+    >
+      <input type="hidden" name="action" value="add" />
+      <input type="hidden" name="product_id" value={product.id} />
+      <input type="hidden" name="redirect_to" value="/cart" />
+
+      {options.map((option) => {
+        const describedBy = option.description ? `opt-${option.id}-desc` : undefined;
+
+        return (
+        <div
+          class="field"
+          data-option={option.id}
+          data-option-variant={option.variant ? '' : undefined}
+          data-option-parent={option.parentId || undefined}
+          data-option-parent-values={
+            option.parentValueIds.length > 0 ? option.parentValueIds.join(',') : undefined
+          }
+          hidden={Boolean(option.parentId)}
+        >
+          <label class="field__label" for={`opt-${option.id}`}>
+            <span>{option.name}</span>
+            {optionPrice(option) > 0 && (
+              <span class="field__note">
+                {`+${formatMoney(optionPrice(option), currency, locale)}`}
+              </span>
+            )}
+          </label>
+
+          {option.description && (
+            <p class="field__hint" id={`opt-${option.id}-desc`}>{option.description}</p>
+          )}
+
+          {option.input === 'select' && (
+            <select
+              class="input"
+              id={`opt-${option.id}`}
+              name={option.field}
+              required={option.required}
+              disabled={Boolean(option.parentId)}
+              aria-describedby={describedBy}
+            >
+              {/* An empty first row is what makes `required` mean anything on
+                  a select: without it the first value is already chosen. */}
+              <option value="">{option.hint || t('product_option_choose')}</option>
+              {option.values.map((value) => (
+                <option
+                  value={value.id}
+                  data-price={value.price}
+                  data-label={value.name}
+                  data-image={value.image || undefined}
+                >
+                  {value.price > 0
+                    ? `${value.name} (+${formatMoney(value.price, currency, locale)})`
+                    : value.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {option.input === 'toggle' && option.values[0] && (
+            <label class="check">
+              <input
+                class="check__box"
+                type="checkbox"
+                id={`opt-${option.id}`}
+                name={option.field}
+                value={option.values[0].id}
+                required={option.required}
+                disabled={Boolean(option.parentId)}
+              aria-describedby={describedBy}
+                data-price={optionPrice(option, option.values[0].id)}
+                data-label={option.values[0].name}
+              />
+              <span>
+                {option.values[0].name}
+                {optionPrice(option, option.values[0].id) > 0 &&
+                  ` (+${formatMoney(optionPrice(option, option.values[0].id), currency, locale)})`}
+              </span>
+            </label>
+          )}
+
+          {option.input === 'short_text' && (
+            <input
+              class="input"
+              type="text"
+              id={`opt-${option.id}`}
+              name={option.field}
+              placeholder={option.hint}
+              maxlength="80"
+              required={option.required}
+              disabled={Boolean(option.parentId)}
+              aria-describedby={describedBy}
+              data-price={option.price}
+            />
+          )}
+
+          {option.input === 'long_text' && (
+            <textarea
+              class="input input--area"
+              id={`opt-${option.id}`}
+              name={option.field}
+              placeholder={option.hint}
+              maxlength="500"
+              rows="3"
+              required={option.required}
+              disabled={Boolean(option.parentId)}
+              aria-describedby={describedBy}
+              data-price={option.price}
+            />
+          )}
+
+        </div>
+        );
+      })}
+
+      <label class="field field--qty">
+        <span class="field__label"><T id="product_quantity_label" /></span>
+        <input
+          class="input"
+          type="number"
+          name="quantity"
+          value="1"
+          min="1"
+          step="1"
+        />
+      </label>
+
+      {options.some((option) => option.required) && (
+        <p class="error" data-option-error hidden>
+          <T id="product_option_error" />
+        </p>
+      )}
+
+      <button
+        class="btn btn--primary btn--block"
+        type="submit"
+        disabled={soldOut}
+      >
+        {soldOut ? <T id="product_sold_out" /> : <T id="product_add_to_cart" />}
+      </button>
+    </form>
+
+    {/* Conditional options: an option with a parent is only asked when the
+        parent holds one of its values. Rendered hidden and disabled, because
+        no parent can match at first paint — a select starts on its empty row,
+        a toggle starts unchecked. Disabled is what makes that safe without
+        JavaScript: the control is barred from validation, so it cannot block
+        the form, and left out of the post, so it cannot be charged for. */}
+    {options.length > 0 && (
+      <script is:inline>
+        (function () {
+          var form = document.querySelector('[data-cart-form]');
+          if (!form) return;
+
+          var children = form.querySelectorAll('[data-option-parent]');
+
+          function valueOf(field) {
+            var control = field && field.querySelector('[name^="options["]');
+            if (!control) return '';
+            if (control.type === 'checkbox') return control.checked ? control.value : '';
+            return control.value;
+          }
+
+          function sync() {
+            // Repeat until nothing moves: a parent can itself be a child, and
+            // the merchant's order does not promise parents come first, so
+            // clearing one has to re-hide whatever depended on it.
+            var changed = true;
+            var passes = 0;
+
+            while (changed && passes++ <= children.length) {
+              changed = false;
+              children.forEach(function (field) {
+                var parent = form.querySelector(
+                  '[data-option="' + field.getAttribute('data-option-parent') + '"]',
+                );
+                var wanted = (field.getAttribute('data-option-parent-values') || '').split(',');
+                // A hidden parent has been cleared, so its value matches
+                // nothing and its own children fall away with it.
+                var show = parent ? wanted.indexOf(valueOf(parent)) !== -1 : true;
+
+                if (field.hidden === !show) return;
+                field.hidden = !show;
+                changed = true;
+
+                field.querySelectorAll('[name^="options["]').forEach(function (control) {
+                  // A hidden control must not carry an answer into the cart,
+                  // and must not hold up the form while it is out of sight.
+                  control.disabled = !show;
+                  if (!show) {
+                    if (control.type === 'checkbox') control.checked = false;
+                    else control.value = '';
+                  }
+                });
+              });
+            }
+          }
+
+          // A value that carries its own picture — a colourway — replaces the
+          // lead image when it is chosen, and the product's own comes back
+          // when the shopper returns to the empty row.
+          var lead = document.querySelector('[data-pdp-media] img');
+
+          if (lead) {
+            var original = lead.getAttribute('src');
+
+            form.addEventListener('change', function (event) {
+              var select = event.target;
+              if (!select.matches || !select.matches('select[name^="options["]')) return;
+
+              var picked = select.selectedOptions[0];
+              if (!picked) return;
+
+              // Only a select whose values carry pictures speaks for the lead
+              // image, so a size menu never blanks it.
+              var carries = select.querySelector('option[data-image]');
+              if (!carries) return;
+
+              var next = picked.getAttribute('data-image') || original;
+              if (next !== lead.getAttribute('src')) {
+                lead.setAttribute('src', next);
+                lead.removeAttribute('srcset');
+              }
+            });
+          }
+
+          if (children.length) {
+            form.addEventListener('change', sync);
+            sync();
+          }
+
+          // Required options, checked here rather than by the browser: the
+          // native bubble points at one control and says nothing useful about
+          // a shop's options, and the store's own sentence is editable copy.
+          // Without JavaScript this block never runs and `required` still
+          // blocks the submit, which is the correct fallback.
+          var error = form.querySelector('[data-option-error]');
+          if (!error) return;
+
+          form.noValidate = true;
+
+          function firstMissing() {
+            var controls = form.querySelectorAll('[name^="options["]');
+
+            for (var i = 0; i < controls.length; i++) {
+              var control = controls[i];
+              if (control.disabled || !control.required) continue;
+
+              var answered =
+                control.type === 'checkbox' ? control.checked : control.value.trim() !== '';
+
+              if (!answered) return control;
+            }
+
+            return null;
+          }
+
+          form.addEventListener(
+            'submit',
+            function (event) {
+              var missing = firstMissing();
+              if (!missing) return;
+
+              // Stop the drawer's own submit handler as well as the post.
+              event.preventDefault();
+              event.stopPropagation();
+
+              error.hidden = false;
+              missing.focus();
+            },
+            true,
+          );
+
+          form.addEventListener('input', function () {
+            if (!error.hidden && !firstMissing()) error.hidden = true;
+          });
+          form.addEventListener('change', function () {
+            if (!error.hidden && !firstMissing()) error.hidden = true;
+          });
+        })();
+      </script>
+    )}
+
+    {product.description && (
+      <div class="pdp__block">
+        <h2 class="section__title"><T id="product_details_title" /></h2>
+        <div class="prose" set:html={product.description} />
+      </div>
+    )}
+  </div>
+
+  {recommended.length > 0 && (
+    <section class="pdp__more">
+      <div class="section__head">
+        <h2 class="section__title"><T id="product_recommended_title" /></h2>
+      </div>
+
+      <div class="grid">
+        {recommended.map((item: SwellData) => (
+          <ProductCard product={item} />
+        ))}
+      </div>
+    </section>
+  )}
+</div>

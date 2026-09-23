@@ -1,0 +1,24 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * A heading with one button. The link is checked when it is saved — a path
+ * on this store or an http(s) URL — and falls back to the shop.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+---
+
+<section class="sec sec--cta" data-section={section.id} data-section-type="cta">
+  <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+  {(section.cta_label || editMode) && (
+    <a class="btn btn--primary" href={section.cta_url || '/'}>
+      <T id={`sec:${section.id}:cta_label`} value={section.cta_label} />
+    </a>
+  )}
+</section>

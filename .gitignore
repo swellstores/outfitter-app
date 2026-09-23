@@ -1,0 +1,9 @@
+node_modules
+.wrangler
+.dev.vars
+.dev.vars.*
+dist
+.astro
+
+# Local CLI state: the app id this working copy is pointed at.
+.swellrc

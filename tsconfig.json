@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "esnext",
+      "webworker"
+    ],
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "types": [
+      "@swell/app-types"
+    ]
+  },
+  "include": [
+    "frontend/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

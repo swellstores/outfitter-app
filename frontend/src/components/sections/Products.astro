@@ -1,0 +1,102 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import ProductCard from '@/components/ProductCard.astro';
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * The category row and the product grid. The markup is the home page's
+ * original product section; only the heading comes from the section — the
+ * counts and the empty state stay the store's copy.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { swell, t } = Astro.locals;
+
+// The section's own category. A store-wide setting used to stand behind this,
+// which meant one value quietly filtered every products section wherever it
+// appeared; the category belongs to the section that shows it.
+const featured = section.category;
+const limit = section.limit;
+
+// Products and categories are independent reads, so they go out together.
+let [list, categoryList] = await Promise.all([
+  swell.storefront.products
+    .list(featured ? { category: featured, limit } : { limit })
+    .catch(() => null),
+  swell.storefront.categories.list({ limit: 8 }).catch(() => null),
+]);
+
+// The category is typed by hand — there is no lookup field — so a slug that
+// matches nothing is likely enough to be worth falling back to the newest
+// products instead of showing an empty shop.
+const showingFeatured = Boolean(featured && list?.results?.length);
+
+if (featured && !showingFeatured) {
+  list = await swell.storefront.products.list({ limit }).catch(() => null);
+}
+
+const products: SwellData[] = list?.results ?? [];
+
+const categories: SwellData[] = categoryList?.results ?? [];
+
+const featuredName = showingFeatured
+  ? categories.find(
+      (category: SwellData) => (category.slug || category.id) === featured,
+    )?.name
+  : undefined;
+---
+
+<section class="section" data-section={section.id} data-section-type="products">
+  {
+    categories.length > 0 && (
+      <nav class="browse" aria-label={t('home_categories_label')}>
+        <span class="eyebrow"><T id="home_browse_eyebrow" /></span>
+        {categories.map((category: SwellData) => (
+          <a
+            href={`/categories/${category.slug || category.id}`}
+            aria-current={
+              showingFeatured && (category.slug || category.id) === featured
+                ? 'page'
+                : undefined
+            }
+          >
+            {category.name}
+          </a>
+        ))}
+      </nav>
+    )
+  }
+
+  <div class="section__head">
+    <h2 class="section__title">{featuredName ? featuredName : <T id={`sec:${section.id}:heading`} value={section.heading} />}</h2>
+    {
+      products.length > 0 && (
+        <p class="meta">
+          {products.length} {products.length === 1 ? <T id="home_count_one" /> : <T id="home_count_other" />}
+        </p>
+      )
+    }
+  </div>
+
+  {
+    products.length > 0 ? (
+      <div class="grid">
+        {products.map((product: SwellData) => (
+          <ProductCard product={product} />
+        ))}
+      </div>
+    ) : (
+      <div class="empty empty--bare">
+        <h3 class="subtitle"><T id="home_empty_title" /></h3>
+        <p class="lede">
+          <T id="home_empty_body" />
+        </p>
+      </div>
+    )
+  }
+</section>

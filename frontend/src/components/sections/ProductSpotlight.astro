@@ -1,0 +1,67 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import T from '@/components/T.astro';
+import { formatMoney } from '@/lib/format';
+import type { Section } from '@/lib/sections';
+
+/**
+ * One product, large: its picture, name and price beside the section's copy
+ * and a button to its page. The name and price are the store's data, not
+ * copy, so they are never editable in place.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode, swell } = Astro.locals;
+const { currency, locale } = swell.getStorefrontLocalization();
+
+// The product named by slug, else the newest one — so the section shows
+// something before the merchant has typed a slug, and if the slug matches
+// nothing.
+let product: SwellData | null = section.product
+  ? await swell.storefront.products.get(section.product).catch(() => null)
+  : null;
+
+if (!product) {
+  const list = await swell.storefront.products.list({ limit: 1 }).catch(() => null);
+  product = list?.results?.[0] ?? null;
+}
+
+const image = product?.images?.[0]?.file?.url;
+const price = product ? formatMoney(product.price, currency, locale) : '';
+const href = product ? `/products/${product.slug || product.id}` : '/';
+---
+
+<section
+  class:list={[
+    'sec',
+    'sec--image-text',
+    'sec--product-spotlight',
+    section.layout === 'image_right' && 'sec--image-right',
+  ]}
+  data-section={section.id}
+  data-section-type="product_spotlight"
+>
+  <div class="sec__media">
+    {image && <img src={image} alt={product?.name} loading="lazy" />}
+  </div>
+
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+    {(section.body || editMode) && (
+      <p class="lede"><T id={`sec:${section.id}:body`} value={section.body} /></p>
+    )}
+    {product && <p class="meta">{product.name} · {price}</p>}
+    {(section.cta_label || editMode) && (
+      <a class="btn btn--primary" href={href}>
+        <T id={`sec:${section.id}:cta_label`} value={section.cta_label} />
+      </a>
+    )}
+  </div>
+</section>

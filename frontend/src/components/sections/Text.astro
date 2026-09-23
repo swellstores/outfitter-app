@@ -1,0 +1,28 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * A short statement on its own. Empty lines are left out of a shopper's
+ * page; in edit mode they stay, empty, so copy typed into the editor's rail
+ * shows up without a reload.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+---
+
+<section class="sec sec--text" data-section={section.id} data-section-type="text">
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+    {(section.body || editMode) && (
+      <p class="lede"><T id={`sec:${section.id}:body`} value={section.body} /></p>
+    )}
+  </div>
+</section>

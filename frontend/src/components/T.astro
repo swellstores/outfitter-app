@@ -1,0 +1,38 @@
+---
+import { CONTENT_FIELDS } from '@/lib/content';
+import { SECTION_FIELDS, type SectionFieldId } from '@/lib/sections';
+
+/**
+ * One piece of the store's copy, by field id from settings/content.json.
+ *
+ * Outside edit mode this is a bare text node — the DOM is exactly what a
+ * literal string in the template would give. In edit mode the text is wrapped
+ * so the editor can find it: `data-edit` carries the field id and
+ * `data-edit-type` whether it is a line or a paragraph.
+ *
+ * A home page section's copy has an id of the form `sec:<section>:<field>`.
+ * It is not in the content panel: the section component has already resolved
+ * it through `getSections()` and passes it in as `value`.
+ *
+ * Copy that lands in an attribute (a title, a placeholder, an aria-label)
+ * cannot carry a span; read it with `Astro.locals.t(id)` instead.
+ */
+interface Props {
+  id: string;
+  /** The resolved copy, for `sec:` ids only. */
+  value?: string;
+}
+
+const { id, value: given } = Astro.props;
+const { t, editMode } = Astro.locals;
+
+const section = id.startsWith('sec:');
+const value = section ? (given ?? '') : t(id);
+const type = section
+  ? SECTION_FIELDS[id.split(':')[2] as SectionFieldId]?.type === 'long_text'
+    ? 'long_text'
+    : 'text'
+  : (CONTENT_FIELDS[id]?.type ?? 'text');
+---
+
+{editMode ? <span data-edit={id} data-edit-type={type}>{value}</span> : value}

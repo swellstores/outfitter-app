@@ -1,0 +1,97 @@
+---
+import type { SwellData } from '@swell/apps-sdk';
+
+import Layout from '@/layouts/Layout.astro';
+import T from '@/components/T.astro';
+import { formatDate, formatMoney } from '@/lib/format';
+
+const { swell, t } = Astro.locals;
+const { currency, locale } = swell.getStorefrontLocalization();
+
+const list = await swell.storefront.account
+  .listOrders({ limit: 20, expand: ['shipments'] })
+  .catch(() => null);
+
+const orders: SwellData[] = list?.results ?? [];
+
+// `shipments` is an expandable link, so it comes back either as a plain array or
+// as a { count, results } page depending on the endpoint.
+function shipmentsOf(order: SwellData): SwellData[] {
+  const shipments = order.shipments;
+
+  return Array.isArray(shipments) ? shipments : (shipments?.results ?? []);
+}
+---
+
+<Layout title={t('account_orders_title')}>
+  <div class="container">
+    <header class="page-head">
+      <p class="eyebrow"><T id="account_orders_eyebrow" /></p>
+      <h1 class="display"><T id="account_orders_title" /></h1>
+    </header>
+
+    {
+      orders.length === 0 ? (
+        <div class="empty">
+          <h2 class="subtitle"><T id="account_orders_empty_title" /></h2>
+          <p class="lede">
+            <T id="account_orders_empty_body" />
+          </p>
+          <a class="btn" href="/">
+            <T id="account_orders_empty_browse" />
+          </a>
+        </div>
+      ) : (
+        <div class="orders">
+          {orders.map((order: SwellData) => (
+            <article class="order">
+              <div class="order__head">
+                <h2 class="order__number">#{order.number || order.id}</h2>
+                <span class="order__total">
+                  {formatMoney(order.grand_total, currency, locale)}
+                </span>
+              </div>
+
+              <p class="order__meta">
+                {formatDate(order.date_created, locale)}
+                {order.status && ` · ${order.status}`}
+              </p>
+
+              {/* Tracking arrives on the standard shipment record, whoever
+                  created it — a warehouse, or a fulfillment app writing back. */}
+              {shipmentsOf(order).length > 0 && (
+                <ul class="shipments">
+                  {shipmentsOf(order).map((shipment: SwellData) => (
+                    <li class="shipment">
+                      <p class="shipment__carrier">
+                        {shipment.carrier_name || shipment.carrier ? (
+                          shipment.carrier_name || shipment.carrier
+                        ) : (
+                          <T id="account_orders_shipment" />
+                        )}
+                        {(shipment.service_name || shipment.service) &&
+                          ` · ${shipment.service_name || shipment.service}`}
+                      </p>
+                      {shipment.tracking_code && (
+                        <p class="shipment__tracking">
+                          <T id="account_orders_tracking" /> {shipment.tracking_code}
+                        </p>
+                      )}
+                      <p class="shipment__date">
+                        {formatDate(shipment.date_created, locale)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          ))}
+        </div>
+      )
+    }
+
+    <p class="form-links">
+      <a href="/account"><T id="account_orders_back" /></a>
+    </p>
+  </div>
+</Layout>

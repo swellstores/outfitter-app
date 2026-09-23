@@ -1,0 +1,47 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * Up to three quotes from customers, each with who said it. A slot with
+ * neither a quote nor a name is left out of a shopper's page; in edit mode
+ * every slot stays, empty, so copy typed into the editor's rail shows up
+ * without a reload. Leave the second and third empty for a single quote.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+---
+
+<section class="sec sec--testimonials" data-section={section.id} data-section-type="testimonials">
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+  </div>
+
+  <div class="sec__grid sec__grid--three">
+    {(section.title_a || section.text_a || editMode) && (
+      <figure class="sec__quote">
+        <blockquote class="lede"><T id={`sec:${section.id}:text_a`} value={section.text_a} /></blockquote>
+        <figcaption class="eyebrow"><T id={`sec:${section.id}:title_a`} value={section.title_a} /></figcaption>
+      </figure>
+    )}
+    {(section.title_b || section.text_b || editMode) && (
+      <figure class="sec__quote">
+        <blockquote class="lede"><T id={`sec:${section.id}:text_b`} value={section.text_b} /></blockquote>
+        <figcaption class="eyebrow"><T id={`sec:${section.id}:title_b`} value={section.title_b} /></figcaption>
+      </figure>
+    )}
+    {(section.title_c || section.text_c || editMode) && (
+      <figure class="sec__quote">
+        <blockquote class="lede"><T id={`sec:${section.id}:text_c`} value={section.text_c} /></blockquote>
+        <figcaption class="eyebrow"><T id={`sec:${section.id}:title_c`} value={section.title_c} /></figcaption>
+      </figure>
+    )}
+  </div>
+</section>

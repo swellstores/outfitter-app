@@ -1,0 +1,16 @@
+{
+  "description": "Self-rendered Swell storefront for a company merch store. Astro on Cloudflare Workers.",
+  "devDependencies": {
+    "@swell/app-types": "^1.2.0",
+    "typescript": "^5.9.3"
+  },
+  "name": "outfitter",
+  "private": true,
+  "scripts": {
+    "typecheck": "npm run typecheck --workspace frontend"
+  },
+  "version": "1.0.0",
+  "workspaces": [
+    "frontend"
+  ]
+}

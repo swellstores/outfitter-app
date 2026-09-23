@@ -1,0 +1,22 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * The opening statement. The markup is the home page's original hero, which
+ * a store with no sections saved still renders exactly.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+---
+
+<section class="hero" data-section={section.id} data-section-type="hero">
+  <div class="hero__lead">
+    <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    <h1 class="display"><T id={`sec:${section.id}:heading`} value={section.heading} /></h1>
+    <p class="lede"><T id={`sec:${section.id}:body`} value={section.body} /></p>
+  </div>
+</section>

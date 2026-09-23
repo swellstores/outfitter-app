@@ -1,0 +1,40 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * A numbered how-it-works in three steps. A step with neither a title nor a
+ * line of text is left out of a shopper's page; in edit mode it stays, empty,
+ * so copy typed into the editor's rail shows up without a reload.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+
+const steps = [
+  ['title_a', 'text_a'],
+  ['title_b', 'text_b'],
+  ['title_c', 'text_c'],
+] as const;
+---
+
+<section class="sec sec--steps" data-section={section.id} data-section-type="steps">
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+  </div>
+
+  <ol class="sec__grid sec__grid--three sec__steps">
+    {steps.map(([title, text]) => (section[title] || section[text] || editMode) && (
+      <li class="sec__item sec__step">
+        <h3 class="sec__item-title"><T id={`sec:${section.id}:${title}`} value={section[title]} /></h3>
+        <p class="sec__item-text"><T id={`sec:${section.id}:${text}`} value={section[text]} /></p>
+      </li>
+    ))}
+  </ol>
+</section>

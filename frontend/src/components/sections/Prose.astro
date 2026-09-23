@@ -1,0 +1,31 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * Several paragraphs beside a heading. The body is one textarea whose blank
+ * lines become paragraphs through `white-space: pre-line`, so it is a single
+ * inline edit with no markup. An empty eyebrow is left out of a shopper's
+ * page; in edit mode it stays, empty, so copy typed into the editor's rail
+ * shows up without a reload.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+---
+
+<section class="sec sec--prose" data-section={section.id} data-section-type="prose">
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+  </div>
+
+  <div class="prose sec__prose">
+    <T id={`sec:${section.id}:body`} value={section.body} />
+  </div>
+</section>

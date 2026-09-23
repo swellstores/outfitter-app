@@ -1,0 +1,35 @@
+---
+import T from '@/components/T.astro';
+import type { Section } from '@/lib/sections';
+
+/**
+ * A picture beside a heading and a paragraph. The picture is decorative —
+ * the copy beside it carries the meaning — so it has no alt text of its own.
+ */
+interface Props {
+  section: Section;
+}
+
+const { section } = Astro.props;
+const { editMode } = Astro.locals;
+---
+
+<section
+  class:list={['sec', 'sec--image-text', section.layout === 'image_right' && 'sec--image-right']}
+  data-section={section.id}
+  data-section-type="image_text"
+>
+  <div class="sec__media">
+    {section.image && <img src={section.image} alt="" loading="lazy" />}
+  </div>
+
+  <div class="sec__lead">
+    {(section.eyebrow || editMode) && (
+      <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
+    )}
+    <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+    {(section.body || editMode) && (
+      <p class="lede"><T id={`sec:${section.id}:body`} value={section.body} /></p>
+    )}
+  </div>
+</section>
