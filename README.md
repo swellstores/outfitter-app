@@ -8,11 +8,6 @@ visual editor the app itself serves at `/editor`.
 Marketing copy for the App Store listing lives in [DESCRIPTION.md](DESCRIPTION.md).
 This file is for people working on the code.
 
-> **Before your first `swell app push`, read [App Store listing](#app-store-listing).**
-> The platform publishes a root `README.md` as the app's public listing. That is
-> why the listing copy sits in `DESCRIPTION.md` here — but the platform does not
-> know that yet.
-
 ## What you need
 
 | | |
@@ -154,40 +149,3 @@ from that file.
 
 **A new setting** — add it to `settings/outfitter.json` and read it off
 `getAppSettings()`.
-
-## Things that will cost you an hour
-
-**Your change is live but the page still looks old.** Pages are edge-cached
-(default 60s, `cache_ttl` in settings) and there is a second 60s memo on the
-settings read. Add any query string to force a fresh render: `/?x=1`.
-
-**Editing `settings/*.json` does not redeploy the worker.** `content.json` and
-`outfitter.json` are build-time imports bundled into the worker, but the CLI's
-rebuild trigger only hashes `frontend/**` and the root `package.json`. The
-dashboard shows your new field immediately; the storefront keeps the old bundle
-until something under `frontend/` changes.
-
-**Writing settings replaces the whole document.** A `PUT` with
-`$set: { values }` overwrites `values` wholesale — every panel, not just yours.
-Read the document, merge your panel into it, write it back. The same applies to
-the dashboard's own Save button, which rebuilds the document from the fields it
-rendered, so keys it does not know about are dropped.
-
-**Astro drops backslashes in literal attribute values.** `pattern=".*\S.*"`
-reaches the browser as `pattern=".*S.*"` and quietly demands a capital S. Put the
-value in an expression, or do the check in script.
-
-**`astro check` does not look inside `is:inline` scripts.** A syntax error there
-typechecks clean and ships. Extract the script and `node --check` it.
-
-## App Store listing
-
-The platform reads the app's root `README.md` — this file — and publishes its
-body as the listing's `full_description` (capped at 20,000 characters). It is not
-taken from `swell.json`, whose `description` is only the one-line card subtitle.
-
-So until the platform reads `DESCRIPTION.md` instead, **a full `swell app push`
-will publish this developer README as the public listing.** If you need to push
-before then, restore the listing afterwards by pushing `DESCRIPTION.md`'s contents
-as `README.md`, or push individual files (`swell app push swell.json`), which
-skips both the listing and the frontend deploy.
