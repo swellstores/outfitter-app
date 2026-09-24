@@ -56,9 +56,9 @@ swell app frontend deploy # same deploy, and prints the storefront URL
 `swell app push` hash-diffs local files against the app's remote configs and
 uploads what changed. Two things surprise people:
 
-- **A fresh clone has no app id.** `.swellrc` holds it and is gitignored, so the
-  first push from a new clone creates a new app on your store rather than
-  updating an existing one.
+- **`.swellrc` names the app a push updates.** It is committed, so a push from a
+  clone updates that app rather than creating one. Delete it to have the CLI
+  create a new app on your store and write a fresh id.
 - **A push deletes remote files that no longer exist locally.** The deletes run
   after the uploads, so a `--force` push in the same run does not undo it.
 
