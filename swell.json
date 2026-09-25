@@ -27,5 +27,31 @@
 			"label": "Open editor",
 			"link": "frontend://editor"
 		}
-	}
+	},
+	"images": [
+		{
+			"id": "storefront",
+			"title": "A finished store, before you touch it",
+			"description": "Installs rendering its own pages — header, hero, navigation and catalog — with nothing to configure first.",
+			"image_src": "assets/images/01-storefront.png"
+		},
+		{
+			"id": "sections",
+			"title": "Pages built from sections",
+			"description": "Seventeen section types arranged in the editor: the product grid, three across, above an image and text block.",
+			"image_src": "assets/images/02-sections.png"
+		},
+		{
+			"id": "product",
+			"title": "Product options, variant and not",
+			"description": "Size and colour resolve the variant; text, toggle and select options ride along to the cart.",
+			"image_src": "assets/images/03-product.png"
+		},
+		{
+			"id": "category",
+			"title": "Category pages that keep their products",
+			"description": "Every page keeps the section it exists for, with marketing sections arranged above and below it.",
+			"image_src": "assets/images/04-category.png"
+		}
+	]
 }
