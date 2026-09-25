@@ -3,7 +3,7 @@
 	"name": "Outfitter",
 	"description": "Install it and you have a merch store. No theme, no build.",
 	"type": "storefront",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"categories": [
 		"store_design"
 	],
