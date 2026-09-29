@@ -30,28 +30,28 @@
 	},
 	"images": [
 		{
-			"id": "storefront",
-			"title": "A finished store, before you touch it",
-			"description": "Installs rendering its own pages — header, hero, navigation and catalog — with nothing to configure first.",
-			"image_src": "assets/images/01-storefront.png"
-		},
-		{
 			"id": "sections",
-			"title": "Pages built from sections",
-			"description": "Seventeen section types arranged in the editor: the product grid, three across, above an image and text block.",
-			"image_src": "assets/images/02-sections.png"
+			"title": "Build every page from sections",
+			"description": "Arrange the home, product and category pages from seventeen section types. Drag to reorder, hide without deleting, preview on any screen.",
+			"image_src": "assets/images/01-sections.png"
 		},
 		{
-			"id": "product",
-			"title": "Product options, variant and not",
-			"description": "Size and colour resolve the variant; text, toggle and select options ride along to the cart.",
-			"image_src": "assets/images/03-product.png"
+			"id": "copy",
+			"title": "Edit the words on the page itself",
+			"description": "Click any line of your store's copy and type over it, or set it in the section's settings. All 143 strings, in every language you sell in.",
+			"image_src": "assets/images/02-copy.png"
 		},
 		{
-			"id": "category",
-			"title": "Category pages that keep their products",
-			"description": "Every page keeps the section it exists for, with marketing sections arranged above and below it.",
-			"image_src": "assets/images/04-category.png"
+			"id": "options",
+			"title": "Sizes, colors and the photo to match",
+			"description": "Size and color pick the variant, a color can carry its own photo, and add-ons are priced per option all the way to the order.",
+			"image_src": "assets/images/03-options.png"
+		},
+		{
+			"id": "colors",
+			"title": "Seven colors, the whole store follows",
+			"description": "Set a palette, logo and store name once. Buttons, text and every hairline pick it up, shown against the default the store installs with.",
+			"image_src": "assets/images/04-colors.png"
 		}
 	]
 }

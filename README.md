@@ -70,7 +70,7 @@ settings/             merchant-facing settings panels (JSON schema, rendered by 
   outfitter.json        store name, logo, palette, cache TTL, demo mode
   content.json          every shopper-facing string, per locale
   sections.json         the home page's section list (product/category are editor-only)
-assets/               icon, screenshots and preview images for the App Store
+assets/               icon, preview and gallery images for the App Store
 frontend/             the Astro app — everything below is under frontend/src
   middleware/           the request chain (see below)
   layouts/Layout.astro  the shell: head, header, footer, cart drawer, and the whole stylesheet
