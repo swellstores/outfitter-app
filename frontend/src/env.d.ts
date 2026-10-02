@@ -33,9 +33,10 @@ declare namespace App {
     /**
      * True when this render is for the copy editor: the URL carries `__edit`
      * and the request passes the editor gate — editor or preview mode, with a
-     * dashboard session this store's admin API confirms. Set by the `editMode`
-     * middleware on every request; false on a live storefront no matter what
-     * the URL says.
+     * signed Swell-Context naming an admin of this store (dev builds also
+     * accept the dashboard session cookie). Set by the `editMode` middleware
+     * on every request; false on a live storefront no matter what the URL
+     * says.
      */
     editMode: boolean;
 

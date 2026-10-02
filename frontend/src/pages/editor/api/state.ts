@@ -34,14 +34,15 @@ export const GET: APIRoute = async (context) => {
   const storefrontId = getStorefrontId(context);
   const warnings: string[] = [];
 
-  // The gate's own settings read runs alongside the others rather than ahead
-  // of them. Nothing read here is returned unless it passes, and every read is
+  // The gate's own check runs alongside the reads rather than ahead of
+  // them. Nothing read here is returned unless it passes, and every read is
   // the app's own data, so starting them early leaks nothing.
   const [allowed, store, values, products, categories] = await Promise.all([
     isEditorRequest(context),
     getStoreLocales(swell, tenant),
     readSettingsValues(swell, storefrontId).catch((err: unknown) => {
-      warnings.push(`Settings could not be read: ${message(err)}`);
+      console.error('Editor state read failed', err);
+      warnings.push('Saved settings could not be read — reopen the editor to try again.');
       return {} as Record<string, unknown>;
     }),
     swell.storefront.products.list({ limit: 1 }).catch(() => null),
@@ -50,6 +51,14 @@ export const GET: APIRoute = async (context) => {
 
   if (!allowed) {
     return jsonResponse({ error: 'not_found' }, 404);
+  }
+
+  // Without the store's default locale, copy saves are refused: by the
+  // content route, and for the whole session by the shell, which cannot tell
+  // where default copy is stored when `defaultLocale` is empty. The merchant
+  // hears why before making one.
+  if (!store) {
+    warnings.push('The store’s languages could not be read — reopen the editor before editing copy.');
   }
 
   const product: SwellData | undefined = products?.results?.[0];
@@ -106,7 +115,7 @@ export const GET: APIRoute = async (context) => {
 
   const state: EditorState = {
     storefrontId,
-    defaultLocale: store.locale,
+    defaultLocale: store?.locale ?? '',
     pages,
     content: {
       values: isRecord(values[CONTENT_PANEL]) ? values[CONTENT_PANEL] : {},
@@ -131,7 +140,3 @@ export const GET: APIRoute = async (context) => {
 
   return jsonResponse(state);
 };
-
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}

@@ -9,8 +9,9 @@ import { isEditorRequest } from '@/lib/editor';
  *
  * Edit mode needs two things at once: the `__edit` flag on the URL and a
  * request the editor gate accepts — editor or preview mode, with a signed
- * context naming an admin. The flag alone does nothing, so a shopper who finds it
- * sees the ordinary page.
+ * Swell-Context naming an admin of this store (dev builds also accept the
+ * dashboard session cookie). The flag alone does nothing, so a shopper who
+ * finds it sees the ordinary page.
  *
  * This runs before the page cache on purpose: an editing render is never
  * cached, and the cache reads nothing else from here. The copy itself is

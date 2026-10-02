@@ -36,9 +36,11 @@ export interface VerifyOptions {
 const CLOCK_TOLERANCE_SECONDS = 30;
 
 /**
- * One key set per issuer, kept for the isolate's life. jose caches the keys,
- * refetches for a key id it has not seen (a rotated key) at most once per
- * cooldown, and shares one fetch between concurrent requests.
+ * One key set per issuer, kept for the isolate's life. jose caches the keys
+ * for `cacheMaxAge` and refetches for a key id it has not seen (a rotated key)
+ * at most once per cooldown. On Workers it does not share an in-flight fetch,
+ * so concurrent requests on a cold or stale cache each fetch; a fetch that
+ * fails then fails that request's verification, and the gate stays shut.
  */
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 

@@ -61,7 +61,7 @@ export const POST: APIRoute = async (context) => {
 
   const ref = parseSectionId(id);
 
-  if (!ref && !CONTENT_FIELDS[id]) {
+  if (!ref && !Object.hasOwn(CONTENT_FIELDS, id)) {
     return jsonResponse({ error: 'unknown_field' }, 400);
   }
 
@@ -80,6 +80,13 @@ export const POST: APIRoute = async (context) => {
   const tenant = tenantKey(context);
   const store = await getStoreLocales(swell, tenant);
 
+  // Whether the locale is the default decides where the copy goes, and the
+  // wrong answer writes a translation over the copy every shopper sees. So it
+  // is never guessed: without the store's own answer, nothing is written.
+  if (!store) {
+    return jsonResponse({ error: 'locales_unavailable' }, 503);
+  }
+
   if (typeof locale !== 'string' || !store.codes.includes(locale)) {
     return jsonResponse({ error: 'unknown_locale' }, 400);
   }
@@ -95,7 +102,8 @@ export const POST: APIRoute = async (context) => {
   try {
     values = await readSettingsValues(swell, storefrontId);
   } catch (err) {
-    return jsonResponse({ error: 'read_failed', detail: message(err) }, 502);
+    console.error('Editor copy read failed', err);
+    return jsonResponse({ error: 'read_failed' }, 502);
   }
 
   const isDefault = locale === store.locale;
@@ -150,7 +158,8 @@ export const POST: APIRoute = async (context) => {
   try {
     await writeSettingsValues(swell, storefrontId, next);
   } catch (err) {
-    return jsonResponse({ error: 'write_failed', detail: message(err) }, 502);
+    console.error('Editor copy write failed', err);
+    return jsonResponse({ error: 'write_failed' }, 502);
   }
 
   invalidateAppSettings(tenant);
@@ -190,8 +199,4 @@ function setOverride(
   } else {
     delete target.$locale;
   }
-}
-
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

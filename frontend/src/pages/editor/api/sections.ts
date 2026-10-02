@@ -63,7 +63,8 @@ export const POST: APIRoute = async (context) => {
   try {
     values = await readSettingsValues(swell, storefrontId);
   } catch (err) {
-    return jsonResponse({ error: 'read_failed', detail: message(err) }, 502);
+    console.error('Editor sections read failed', err);
+    return jsonResponse({ error: 'read_failed' }, 502);
   }
 
   const panel = isRecord(values[SECTIONS_PANEL]) ? values[SECTIONS_PANEL] : {};
@@ -74,7 +75,8 @@ export const POST: APIRoute = async (context) => {
       [SECTIONS_PANEL]: { ...panel, [page]: check.sections },
     });
   } catch (err) {
-    return jsonResponse({ error: 'write_failed', detail: message(err) }, 502);
+    console.error('Editor sections write failed', err);
+    return jsonResponse({ error: 'write_failed' }, 502);
   }
 
   invalidateAppSettings(tenantKey(context));
@@ -86,7 +88,3 @@ export const POST: APIRoute = async (context) => {
     sections: pageSections({ [page]: check.sections }, page, values[CONTENT_PANEL]),
   });
 };
-
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}

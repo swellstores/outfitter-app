@@ -125,7 +125,8 @@ export const POST: APIRoute = async (context) => {
 
     return jsonResponse({ ok: true, url });
   } catch (err) {
-    return jsonResponse({ error: 'upload_failed', detail: message(err) }, 502);
+    console.error('Editor upload failed', err);
+    return jsonResponse({ error: 'upload_failed' }, 502);
   }
 };
 
@@ -210,8 +211,4 @@ function safeFilename(raw: unknown, contentType: string): string | undefined {
     .slice(0, 60);
 
   return base ? `${base}${EXTENSIONS[contentType]}` : undefined;
-}
-
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

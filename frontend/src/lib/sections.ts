@@ -207,6 +207,13 @@ export interface Section {
 const MAX_TEXT_LENGTH = 4000;
 /** Most sections one page holds. */
 export const MAX_SECTIONS = 20;
+/**
+ * Most locales one section carries its own copy for. Well above what a store
+ * runs, because the copy editor and the dashboard store one for each of the
+ * store's locales without checking it, and an item over it could no longer be
+ * saved from here.
+ */
+const MAX_LOCALES = 100;
 const MAX_LIMIT = 48;
 const DEFAULT_LIMIT = 12;
 
@@ -1084,7 +1091,7 @@ export function parseSectionId(
 ): { itemId: string; field: SectionFieldId } | undefined {
   const match = /^sec:([a-z0-9][a-z0-9_-]{0,39}):([a-z_]+)$/.exec(id);
 
-  if (!match || !(match[2] in SECTION_FIELDS)) {
+  if (!match || !Object.hasOwn(SECTION_FIELDS, match[2])) {
     return undefined;
   }
 
@@ -1299,8 +1306,15 @@ function readLocales(
   }
 
   const locales: Record<string, Record<string, string>> = {};
+  const entries = Object.entries(raw);
 
-  for (const [code, values] of Object.entries(raw)) {
+  // Only a write is held to the cap. A stored item over it reads whole: it
+  // is the copy shoppers see, and the content route writes the item back.
+  if (entries.length > MAX_LOCALES) {
+    errors?.push(`${at}.$locale: at most ${MAX_LOCALES} locales`);
+  }
+
+  for (const [code, values] of entries) {
     if (!LOCALE_PATTERN.test(code)) {
       errors?.push(`${at}.$locale.${code}: not a locale code`);
       continue;

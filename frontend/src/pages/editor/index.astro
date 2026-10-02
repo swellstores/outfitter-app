@@ -8,9 +8,10 @@ import { SETTINGS_TABS, isEditorMode } from '@/lib/editor';
  * app of its own — none of the storefront's chrome — drawn with the
  * storefront's tokens so it reads as part of the product.
  *
- * The middleware already rewrites this path to a 404 outside editor and
- * preview requests; checking again here costs nothing. The key itself is
- * asked for here and checked by the API, so the shell needs only the mode.
+ * The middleware already sends any request its gate refuses — one without a
+ * signed Swell-Context naming an admin — to the storefront; checking the mode
+ * again here costs nothing. The API checks the gate on every call, so the
+ * shell needs only the mode.
  */
 if (!isEditorMode(Astro.locals.swell)) {
   return new Response(null, { status: 404 });
@@ -237,7 +238,7 @@ Astro.response.headers.set('cache-control', 'no-store, private');
       }
 
       const EDIT_MESSAGE = 'outfitter:edit';
-      const EDITED_MESSAGE = 'outfitter:edited';
+      const SAVE_MESSAGE = 'outfitter:save';
       const PAGE_MESSAGE = 'outfitter:page';
       const SECTION_HOVER_MESSAGE = 'outfitter:section-hover';
       const SECTION_MOVE_MESSAGE = 'outfitter:section-move';
@@ -357,16 +358,29 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         return state.sections.types.find((entry) => entry.type === type);
       }
 
-      /** Splits `sec:<section>:<field>`; anything else is a content field id. */
-      function sectionRef(id: string): { item: StoredSection; field: string } | undefined {
+      /**
+       * Splits `sec:<section>:<field>`; anything else is a content field id.
+       * In the current page's list unless another page is named: a save
+       * resolves against the page it was made on.
+       */
+      function sectionRef(
+        id: string,
+        pageId?: string,
+      ): { item: StoredSection; field: string } | undefined {
         const match = /^sec:([^:]+):([^:]+)$/.exec(id);
-        const item = match && listFor().find((entry) => entry.id === match[1]);
+        const item = match && listFor(pageId).find((entry) => entry.id === match[1]);
 
         return item && match ? { item, field: match[2] } : undefined;
       }
 
-      function targetOf(id: string): Target | undefined {
-        const ref = sectionRef(id);
+      function targetOf(id: string, pageId?: string): Target | undefined {
+        // The page can save copy before the state call is in; there is
+        // nothing to resolve it against yet.
+        if (!state) {
+          return undefined;
+        }
+
+        const ref = sectionRef(id, pageId);
 
         if (ref) {
           const field = typeFor(ref.item.type)?.fields.find((entry) => entry.id === ref.field);
@@ -384,8 +398,8 @@ Astro.response.headers.set('cache-control', 'no-store, private');
       }
 
       /** What is saved for exactly this locale, if anything. */
-      function stored(id: string, code: string): string | undefined {
-        const target = targetOf(id);
+      function stored(id: string, code: string, pageId?: string): string | undefined {
+        const target = targetOf(id, pageId);
 
         if (!target) {
           return undefined;
@@ -423,9 +437,17 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         );
       }
 
-      /** Records a save locally, the same way the API stored it. */
-      function remember(id: string, code: string, value: string): void {
-        const target = targetOf(id);
+      /**
+       * Records a save locally, the same way the API stores it. `undefined`
+       * removes the value, which is how a failed save puts back nothing.
+       */
+      function remember(
+        id: string,
+        code: string,
+        value: string | undefined,
+        pageId?: string,
+      ): void {
+        const target = targetOf(id, pageId);
 
         if (!target) {
           return;
@@ -434,14 +456,18 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         const { record: values, key } = target;
 
         if (!target.localized || code === state.defaultLocale) {
-          values[key] = value;
+          if (value === undefined) {
+            delete values[key];
+          } else {
+            values[key] = value;
+          }
           return;
         }
 
         const locales = record(values.$locale) ?? {};
         const overrides = record(locales[code]) ?? {};
 
-        if (value === '') {
+        if (value === '' || value === undefined) {
           delete overrides[key];
         } else {
           overrides[key] = value;
@@ -463,17 +489,39 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         }
       }
 
-      async function postJson(url: string, body: unknown): Promise<Record<string, unknown>> {
+      /**
+       * What the merchant is told when a write fails upstream. The API names
+       * those by code alone — the reason is in the worker's log, not theirs to
+       * read. A value it refused comes with a detail saying which, shown as is.
+       */
+      const FAILURES = new Map([
+        ['read_failed', 'Could not save — try again.'],
+        ['write_failed', 'Could not save — try again.'],
+        ['locales_unavailable', 'Could not save — try again.'],
+        ['upload_failed', 'Could not upload — try again.'],
+      ]);
+
+      /** Posts JSON; a failure throws with the line to show the merchant. */
+      async function postJson(
+        url: string,
+        body: unknown,
+        keepalive = false,
+      ): Promise<Record<string, unknown>> {
         const res = await fetch(url, {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'content-type': 'application/json', accept: 'application/json' },
           body: JSON.stringify(body),
+          keepalive,
         });
         const data: Record<string, unknown> = await res.json().catch(() => ({}));
 
         if (!res.ok || !data.ok) {
-          throw new Error(String(data.detail || data.error || `HTTP ${res.status}`));
+          const code = String(data.error ?? '');
+
+          throw new Error(
+            FAILURES.get(code) ?? `Error — ${String(data.detail || code || `HTTP ${res.status}`)}`,
+          );
         }
 
         return data;
@@ -503,9 +551,14 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         return `${target.pathname}${target.search}`;
       }
 
+      // Copy saved since the frame last began loading, or still saving when it
+      // did: the page coming in may have been rendered without it.
+      let sinceLoad: CopyEdit[] = [];
+
       /** Every frame load goes through here: same editUrl() rules, plus the busy dim. */
       function loadFrame(url: string, fresh = false): void {
         shownSections = null;
+        sinceLoad = [...unsettled];
         canvas.setAttribute('aria-busy', 'true');
         frame.src = editUrl(url, fresh);
       }
@@ -650,24 +703,41 @@ Astro.response.headers.set('cache-control', 'no-store, private');
           return;
         }
 
-        if (data.type === EDITED_MESSAGE && typeof data.id === 'string' && typeof data.value === 'string') {
-          remember(data.id, locale, data.value);
-          lastSaveAt = Date.now();
-          setStatus('Saved', 'saved');
+        // Copy edited in the page is saved from here, not by the page: applied
+        // first, so a drop or a click on the list that comes after it builds
+        // on it, then posted in its turn with every other write.
+        if (data.type === SAVE_MESSAGE && typeof data.id === 'string' && typeof data.value === 'string') {
+          const id: string = data.id;
+
+          saveCopy(
+            id,
+            typeof data.locale === 'string' ? data.locale : locale,
+            data.value,
+            typeof data.page === 'string' ? data.page : '',
+          )
+            .catch((err: unknown) => {
+              // The page showed the edit at once: it goes back, and says why.
+              frameWindow()?.postMessage(
+                {
+                  type: EDIT_MESSAGE,
+                  id,
+                  value: targetOf(id) ? resolved(id, locale) : undefined,
+                  error: (err as Error).message,
+                },
+                origin,
+              );
+            })
+            // Only once it has settled: the page commits when focus leaves it,
+            // which a press in the shell does before its click lands, and a
+            // list rebuilt under that click would swallow it.
+            .finally(() => showCopy(id));
 
           // Cleared in the page: show what the copy now inherits.
           if (data.value === '') {
-            pushToFrame(data.id);
+            pushToFrame(id);
           }
 
-          // A section's heading names its row in the list.
-          if (sectionRef(data.id)) {
-            renderSections();
-          }
-
-          // The same copy may be open in the panel; keep it and its
-          // inherited/default tag in step with what the page now shows.
-          refreshField(data.id);
+          return;
         }
 
         if (data.type === SECTION_HOVER_MESSAGE) {
@@ -818,6 +888,15 @@ Astro.response.headers.set('cache-control', 'no-store, private');
           // the outline says which section the panel is showing.
           if (trusted && hasList(next.id) && railOpen && selectedSection) {
             selectInFrame(selectedSection);
+          }
+
+          // The same for copy: a render that read the settings before a copy
+          // save landed shows the copy as it was. A section's copy only on the
+          // page it belongs to — an id means nothing in another page's list.
+          for (const edit of sinceLoad) {
+            if (!edit.id.startsWith('sec:') || (trusted && edit.page === next.id)) {
+              pushToFrame(edit.id);
+            }
           }
         }
       });
@@ -1138,14 +1217,14 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         setStatus('Saving…', 'saving');
 
         try {
-          const data = await postJson('/editor/api/settings', { values });
+          const data = await enqueue(() => postJson('/editor/api/settings', { values }));
           state.settings.values = record(data.values) ?? {};
           lastSaveAt = Date.now();
           loadFrame(page.url, true);
           settingsDialog.close();
           setStatus('Saved', 'saved');
         } catch (err) {
-          const message = `Error — ${(err as Error).message}`;
+          const { message } = err as Error;
           setStatus(message, 'error');
           settingsError.textContent = message; // the status pill is behind the backdrop
         } finally {
@@ -1582,11 +1661,124 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         saveSections(next);
       }
 
-      // Saves go out one after another, in the order they were made, and
-      // only the newest reply is acted on: a second quick reorder is never
-      // undone by the first one's answer.
+      // Saves go out one after another, in the order they were made — section
+      // lists, copy and settings alike, because each one reads the whole
+      // settings document and writes it back, and two at once lose one of
+      // them. Only the newest sections reply is acted on: a second quick
+      // reorder is never undone by the first one's answer.
       let saveChain = Promise.resolve();
       let saveSeq = 0;
+      // Writes made and not yet answered, those still waiting their turn too.
+      let writing = 0;
+
+      /** Runs one write once every write made before it has settled. */
+      function enqueue<T>(write: () => Promise<T>): Promise<T> {
+        const run = saveChain.then(write);
+        const done = () => {
+          writing -= 1;
+        };
+
+        writing += 1;
+        // A rejected write must not strand every later one, so the chain
+        // itself never rejects; each caller hears about its own failure.
+        saveChain = run.then(done, done);
+        return run;
+      }
+
+      // A write still waiting its turn is never sent once the editor is gone,
+      // and nothing else says it was lost: leaving while one is pending asks
+      // first.
+      window.addEventListener('beforeunload', (event) => {
+        if (writing > 0) {
+          event.preventDefault();
+        }
+      });
+
+      /** A copy save, applied here as soon as it is made. */
+      interface CopyEdit {
+        id: string;
+        code: string;
+        value: string;
+        page: string;
+        /** What it replaced: put back if it fails. */
+        before: string | undefined;
+      }
+
+      // In the order they were made.
+      const unsettled: CopyEdit[] = [];
+
+      // Section copy saved since the server last answered a sections save for
+      // its page. That answer is what a failed sections save falls back to,
+      // and it has not seen these.
+      let settled: CopyEdit[] = [];
+
+      /**
+       * Saves one piece of copy, typed in the panel or in the page.
+       *
+       * Applied here at once, so a list built while it waits — a hide, a move,
+       * a drop in the page — already carries it, then posted in its turn. A
+       * failure puts back what it replaced, or hands that on to a later edit
+       * of the same copy still waiting, which replaced this one in turn.
+       */
+      function saveCopy(id: string, code: string, value: string, pageId: string): Promise<void> {
+        // The default locale's copy is stored apart from every other's. Not
+        // knowing which locale that is, an edit would be applied here in the
+        // wrong place, and the next list saved would store it there.
+        if (state && !state.defaultLocale) {
+          const message = 'The store’s languages could not be read — reopen the editor to edit copy.';
+          setStatus(message, 'error');
+          return Promise.reject(new Error(message));
+        }
+
+        const edit: CopyEdit = { id, code, value, page: pageId, before: stored(id, code, pageId) };
+
+        remember(id, code, value, pageId);
+        unsettled.push(edit);
+        sinceLoad.push(edit);
+        setStatus('Saving…', 'saving');
+
+        return enqueue(async () => {
+          try {
+            // Kept alive past the editor being closed mid-save, as the page's
+            // own post was; a copy body is well inside keepalive's 64 KB.
+            await postJson('/editor/api/content', { id, locale: code, value, page: pageId }, true);
+            lastSaveAt = Date.now();
+            setStatus('Saved', 'saved');
+
+            if (id.startsWith('sec:')) {
+              settled.push(edit);
+            }
+          } catch (err) {
+            const later = unsettled.find(
+              (other) =>
+                other !== edit && other.id === id && other.code === code && other.page === pageId,
+            );
+
+            if (later) {
+              later.before = edit.before;
+            } else {
+              remember(id, code, edit.before, pageId);
+            }
+
+            setStatus((err as Error).message, 'error');
+            throw err;
+          } finally {
+            unsettled.splice(unsettled.indexOf(edit), 1);
+          }
+        });
+      }
+
+      /**
+       * Puts copy saves back on a list that has not seen them — one the server
+       * just handed over, or the one a failed save fell back to. Without them
+       * the next list built here would undo them.
+       */
+      function reapplyCopy(edits: CopyEdit[]): void {
+        for (const edit of edits) {
+          remember(edit.id, edit.code, edit.value, edit.page);
+        }
+      }
+
       // The list as the server last accepted it: what a failed save falls
       // back to — not the list before it, which an earlier save may have
       // failed to store as well.
@@ -1625,10 +1817,9 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         setStatus('Saving…', 'saving');
 
         const seq = ++saveSeq;
-        // The page is captured here, at issue time. A rejected promise anywhere
-        // in the chain would strand every later save, so the chain is kept
-        // whole and each post reports its own failure.
-        saveChain = saveChain.then(() => postSections(next, seq, pageId)).catch(() => {});
+        // The page is captured here, at issue time. Each post reports its own
+        // failure.
+        enqueue(() => postSections(next, seq, pageId)).catch(() => {});
       }
 
       async function postSections(
@@ -1643,6 +1834,10 @@ Astro.response.headers.set('cache-control', 'no-store, private');
           if (seq !== saveSeq) return;
           savedSections[pageId] = (data.sections as StoredSection[]) ?? next;
           state.sections.lists[pageId] = savedSections[pageId];
+          // Copy saved ahead of this save was made before it, so the list it
+          // posted carries it; copy still waiting is not in it.
+          settled = settled.filter((edit) => edit.page !== pageId);
+          reapplyCopy(unsettled);
           lastFieldKey = null;
           // A field marked by an earlier failure is good again; the panel is
           // not necessarily rebuilt (the merchant may still be in the field),
@@ -1655,7 +1850,8 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         } catch (err) {
           if (seq !== saveSeq) return;
           state.sections.lists[pageId] = savedSections[pageId] ?? [];
-          setStatus(`Error — ${(err as Error).message}`, 'error');
+          reapplyCopy([...settled, ...unsettled]);
+          setStatus((err as Error).message, 'error');
 
           // A validation 400 answers well inside the 400 ms debounce, so a
           // forced rebuild can land under a half-typed field. When the merchant
@@ -2152,24 +2348,30 @@ Astro.response.headers.set('cache-control', 'no-store, private');
             return;
           }
 
-          committed = value;
-          setStatus('Saving…', 'saving');
           wrap.classList.remove('is-error');
 
-          try {
-            await postJson('/editor/api/content', { id, locale, value, page: fieldPage });
-            remember(id, locale, value);
-            setStatus('Saved', 'saved');
-            fill(wrap, id);
-            committed = input.value;
-            pushToFrame(id);
+          // Applied as soon as it is made — see saveCopy.
+          const saving = saveCopy(id, locale, value, fieldPage);
+          fill(wrap, id);
+          committed = input.value;
+          pushToFrame(id);
 
-            if (sectionRef(id)) {
-              renderSections();
-            }
-          } catch (err) {
+          try {
+            await saving;
+          } catch {
+            // Put back everywhere but here: the field keeps what was typed,
+            // measured against what is stored again, so blur or Enter tries
+            // once more and Escape goes back to what is stored.
             wrap.classList.add('is-error');
-            setStatus(`Error — ${(err as Error).message}`, 'error');
+            committed = stored(id, locale, fieldPage) ?? resolved(id, locale);
+            pushToFrame(id);
+          }
+
+          // Only once it has settled. This runs on blur, before the click that
+          // moved focus away lands, and a list rebuilt under that click would
+          // swallow it.
+          if (sectionRef(id)) {
+            renderSections();
           }
         };
 
@@ -2221,6 +2423,22 @@ Astro.response.headers.set('cache-control', 'no-store, private');
         if (wrap) {
           fill(wrap, id);
         }
+      }
+
+      /** Brings the list and the panel in step with copy changed in the page. */
+      function showCopy(id: string): void {
+        if (!state) {
+          return;
+        }
+
+        // A section's heading names its row in the list.
+        if (sectionRef(id)) {
+          renderSections();
+        }
+
+        // The same copy may be open in the panel; keep it and its
+        // inherited/default tag in step with what the page now shows.
+        refreshField(id);
       }
 
       // ---- the image widget: a URL, a file picker, a drop target --------------
@@ -2481,9 +2699,10 @@ Astro.response.headers.set('cache-control', 'no-store, private');
           return;
         }
 
-        // The editor is gated on the dashboard session. A 404 means it is no
-        // longer accepted, and the middleware sends an unauthorized request to
-        // the storefront, so reloading lands the merchant somewhere real.
+        // The editor is gated on a signed Swell-Context naming an admin (a dev
+        // build also takes the dashboard session). A 404 means it is no longer
+        // accepted, and the middleware sends an unauthorized request to the
+        // storefront, so reloading lands the merchant somewhere real.
         if (res.status === 404) {
           window.location.reload();
           return;

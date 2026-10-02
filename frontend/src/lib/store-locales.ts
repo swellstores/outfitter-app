@@ -1,4 +1,6 @@
-import type { Swell, SwellData } from '@swell/apps-sdk';
+import type { Swell } from '@swell/apps-sdk';
+
+import { localizationOptions } from './localization';
 
 export interface StoreLocale {
   code: string;
@@ -9,7 +11,7 @@ export interface StoreLocale {
 export interface StoreLocales {
   /** The store's default locale. */
   locale: string;
-  /** Every locale the store is configured for, the default included. */
+  /** Every locale the store has active, the default included. */
   codes: string[];
   /** The same locales with their names, the default first. */
   list: StoreLocale[];
@@ -23,16 +25,21 @@ const MAX_CACHED_TENANTS = 200;
 const cached = new Map<string, { locales: StoreLocales; at: number }>();
 
 /**
- * The locales the merchant can edit copy for, from the store's own settings.
+ * The locales the merchant can edit copy for: the store's default and every
+ * locale it has active, from the public storefront settings — the same
+ * `settings.state.store` the header's language control reads (see
+ * middleware/localization.ts), so no settings scope is needed for it.
  *
- * Cached per store and never throws — when the settings cannot be read the
- * storefront's current locale is the only one on offer, which is still a
- * working editor rather than an error page.
+ * Cached per store, and never throws. `null` when the settings cannot be
+ * read, and that is not cached. Nothing stands in for the default then: the
+ * storefront's current locale is whatever the merchant picked in the header,
+ * and taking it for the default would write a translation over the copy
+ * every shopper sees.
  */
 export async function getStoreLocales(
   swell: Swell,
   tenant: string,
-): Promise<StoreLocales> {
+): Promise<StoreLocales | null> {
   const entry = cached.get(tenant);
 
   if (entry && Date.now() - entry.at < CACHE_TTL_MS) {
@@ -40,6 +47,10 @@ export async function getStoreLocales(
   }
 
   const locales = await readStoreLocales(swell);
+
+  if (!locales) {
+    return null;
+  }
 
   if (cached.size >= MAX_CACHED_TENANTS) {
     cached.delete(cached.keys().next().value as string);
@@ -50,39 +61,18 @@ export async function getStoreLocales(
   return locales;
 }
 
-async function readStoreLocales(swell: Swell): Promise<StoreLocales> {
-  const store = await swell
-    .get<SwellData>('/settings/store')
-    .catch(() => undefined);
-
-  let locale =
+async function readStoreLocales(swell: Swell): Promise<StoreLocales | null> {
+  // The SDK logs a failed load and resolves anyway, without a store.
+  const settings = await swell.getStorefrontSettings().catch(() => undefined);
+  const store = settings?.state?.store;
+  const locale =
     typeof store?.locale === 'string' && store.locale ? store.locale : '';
 
   if (!locale) {
-    // The SDK only knows the storefront's locale once /settings/all has
-    // loaded; asked before that it answers a hardcoded en-US and keeps the
-    // pending settings promise as the request's currency. Load, then ask.
-    await swell.getStorefrontSettings().catch(() => undefined);
-    locale = swell.getStorefrontLocalization().locale;
+    return null;
   }
 
-  // `locales` is a list of { code, name, ... } records in store settings.
-  const names = new Map<string, string>([[locale, locale]]);
-  const items: unknown[] = Array.isArray(store?.locales) ? store.locales : [];
-
-  for (const item of items) {
-    const record = typeof item === 'string' ? { code: item } : (item as SwellData | null);
-    const code = record?.code;
-
-    if (typeof code === 'string' && code) {
-      names.set(
-        code,
-        typeof record?.name === 'string' && record.name ? record.name : code,
-      );
-    }
-  }
-
-  const list = [...names].map(([code, name]) => ({ code, name }));
+  const list = localizationOptions(locale, store?.locales);
 
   return { locale, codes: list.map((item) => item.code), list };
 }

@@ -291,10 +291,27 @@ export async function readSettingsValues(
     throw err;
   }
 
-  return isRecord(config?.values) ? config.values : {};
+  // Only a missing document reads as empty. Anything else that is not one —
+  // the SDK hands an empty body back as '' — is a failed read: taken for an
+  // empty document, the write after it would leave a single panel standing.
+  if (config === null || config === undefined) {
+    return {};
+  }
+
+  if (!isRecord(config)) {
+    throw new Error('the settings document did not read as an object');
+  }
+
+  return isRecord(config.values) ? config.values : {};
 }
 
-/** Writes `values` back whole — the caller has merged its one panel into it. */
+/**
+ * Writes `values` back whole — the caller has merged its one panel into it.
+ *
+ * Read, change, write back is not atomic: two writes to the same storefront
+ * at once and the later one puts back what the earlier one changed. The
+ * editor shell therefore sends its writes one at a time.
+ */
 export async function writeSettingsValues(
   swell: Swell,
   storefrontId: string,

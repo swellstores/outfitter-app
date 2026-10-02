@@ -70,7 +70,8 @@ export const POST: APIRoute = async (context) => {
   try {
     values = await readSettingsValues(swell, storefrontId);
   } catch (err) {
-    return jsonResponse({ error: 'read_failed', detail: message(err) }, 502);
+    console.error('Editor settings read failed', err);
+    return jsonResponse({ error: 'read_failed' }, 502);
   }
 
   const panel = isRecord(values[SETTINGS_PANEL])
@@ -91,7 +92,8 @@ export const POST: APIRoute = async (context) => {
       [SETTINGS_PANEL]: panel,
     });
   } catch (err) {
-    return jsonResponse({ error: 'write_failed', detail: message(err) }, 502);
+    console.error('Editor settings write failed', err);
+    return jsonResponse({ error: 'write_failed' }, 502);
   }
 
   const tenant = tenantKey(context);
@@ -99,7 +101,3 @@ export const POST: APIRoute = async (context) => {
 
   return jsonResponse({ ok: true, values: panel });
 };
-
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}

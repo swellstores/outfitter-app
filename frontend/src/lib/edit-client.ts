@@ -14,8 +14,12 @@
  * The page normally sits in the editor shell's iframe. The two talk over
  * postMessage, same origin only:
  *
- *   shell → page  { type: 'outfitter:edit', id, value }      show this text
- *   page → shell  { type: 'outfitter:edited', id, value }    this was saved
+ *   shell → page  { type: 'outfitter:edit', id, value?,      show this text — and,
+ *                    error? }                                with an error, that
+ *                                                            saving it failed
+ *   page → shell  { type: 'outfitter:save', id, value,       save this copy — the
+ *                    locale, page }                          shell makes every write,
+ *                                                            one at a time
  *   page → shell  { type: 'outfitter:page', url, locale,     this page is shown,
  *                    sections }                              in this locale, with
  *                                                            these section ids
@@ -47,14 +51,14 @@
  *                                                            never implied by
  *                                                            selecting one
  *
- * Opened on its own, the page still edits and saves; it just has nobody to
- * tell.
+ * Opened on its own, the page still edits, and posts its saves itself.
  */
 
 import { SECTION_LABELS, type SectionType } from '@/lib/sections';
 
 const EDIT_PARAM = '__edit';
 const API = '/editor/api/content';
+const SAVE = 'outfitter:save';
 const SECTION_HOVER = 'outfitter:section-hover';
 const SECTIONS = 'outfitter:sections';
 const SECTION_MOVE = 'outfitter:section-move';
@@ -877,6 +881,15 @@ export function startEditClient(): void {
     // goes back if it does not.
     setText(state.id, value);
 
+    // In the editor the shell saves it, in turn with its own writes. Posted
+    // from here it could cross a section save built without it — a drop that
+    // follows this commit, a click on the shell's list — and one of the two
+    // would be lost. The shell puts the copy back if the save fails.
+    if (shell) {
+      tell({ type: SAVE, id: state.id, value, locale, page: sectionsPage() });
+      return;
+    }
+
     try {
       const res = await fetch(API, {
         method: 'POST',
@@ -892,11 +905,11 @@ export function startEditClient(): void {
       });
       const data = await res.json().catch(() => ({}));
 
+      // A refused value says which; anything else is the merchant's to retry,
+      // not to read.
       if (!res.ok || !data.ok) {
-        throw new Error(data.detail || data.error || `HTTP ${res.status}`);
+        throw new Error(data.detail || 'try again.');
       }
-
-      tell({ type: 'outfitter:edited', id: state.id, value });
     } catch (err) {
       setText(state.id, state.original);
       toast(state.el, `Not saved — ${(err as Error).message}`);
@@ -1472,12 +1485,17 @@ export function startEditClient(): void {
       return;
     }
 
-    if (
-      data.type === 'outfitter:edit' &&
-      typeof data.id === 'string' &&
-      typeof data.value === 'string'
-    ) {
-      setText(data.id, data.value);
+    if (data.type === 'outfitter:edit' && typeof data.id === 'string') {
+      if (typeof data.value === 'string') {
+        setText(data.id, data.value);
+      }
+
+      // The shell's save of an edit made here failed: said where it was made.
+      const el = typeof data.error === 'string' ? editables(data.id)[0] : undefined;
+
+      if (el) {
+        toast(el, data.error);
+      }
     }
   });
 
