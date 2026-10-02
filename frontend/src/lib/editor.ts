@@ -319,7 +319,54 @@ export async function writeSettingsValues(
 ): Promise<void> {
   requireBackend(swell);
 
-  await swell.put(configPath(storefrontId), { $set: { values } });
+  await backendWrite(swell, 'PUT', configPath(storefrontId), { $set: { values } });
+}
+
+/**
+ * A write through the backend API, as `swell.put` and `swell.post` make it —
+ * same host, credentials and error shape — but with the body's length left to
+ * fetch. The SDK's backend client (@swell/apps-sdk 1.0.190) sets Content-Length
+ * to the JSON string's length in UTF-16 units, so a single curly apostrophe,
+ * em dash or accented letter in the copy makes it short of the bytes sent and
+ * the request fails or hangs: every translation, and most typed copy.
+ */
+async function backendWrite<T = SwellData>(
+  swell: Swell,
+  method: 'PUT' | 'POST',
+  url: string,
+  data: unknown,
+): Promise<T> {
+  const { apiHost, apiAuth } = swell.backend as unknown as {
+    apiHost: string;
+    apiAuth: string;
+  };
+
+  const response = await fetch(`${apiHost}/${url.replace(/^\//, '')}`, {
+    method,
+    headers: {
+      Authorization: `Basic ${apiAuth}`,
+      'User-Agent': 'swell-functions/1.0',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  const text = await response.text();
+  let result: unknown;
+
+  try {
+    result = JSON.parse(text);
+  } catch {
+    result = text.trim();
+  }
+
+  if (response.status > 299 || (isRecord(result) && result.errors)) {
+    const error = new Error(`${method} ${url}\n${text.slice(0, 500)}`);
+    Object.assign(error, { status: response.status > 299 ? response.status : 400 });
+    throw error;
+  }
+
+  return result as T;
 }
 
 /**
@@ -338,7 +385,7 @@ export async function uploadFile(
 ): Promise<string> {
   requireBackend(swell);
 
-  const created = await swell.post<SwellData>('/:files', {
+  const created = await backendWrite<SwellData>(swell, 'POST', '/:files', {
     data: { $base64: file.data },
     content_type: file.contentType,
     filename: file.filename,
