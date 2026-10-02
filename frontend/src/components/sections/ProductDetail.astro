@@ -81,7 +81,12 @@ const soldOut =
 
     <p class="pdp__price">
       {onSale && <s>{formatMoney(product.orig_price, currency, locale)}</s>}
-      {formatMoney(product.price, currency, locale)}
+      <span
+        data-pdp-price
+        data-base={product.price}
+        data-currency={currency}
+        data-locale={locale}
+      >{formatMoney(product.price, currency, locale)}</span>
     </p>
 
     {/* data-* carries what the drawer shows before the server answers.
@@ -324,6 +329,43 @@ const soldOut =
           if (children.length) {
             form.addEventListener('change', sync);
             sync();
+          }
+
+          // The price follows what is chosen: the product's own plus each
+          // answered option's price — the same deltas the API adds, and the
+          // ones the cart drawer shows before it replies. Registered after
+          // sync, so an option it has just hidden no longer counts.
+          var price = document.querySelector('[data-pdp-price]');
+
+          if (price) {
+            var base = Number(price.getAttribute('data-base')) || 0;
+            var money = null;
+
+            try {
+              money = new Intl.NumberFormat(price.getAttribute('data-locale') || 'en-US', {
+                style: 'currency',
+                currency: price.getAttribute('data-currency') || 'USD',
+              });
+            } catch (e) {}
+
+            function reprice() {
+              var total = base;
+
+              form.querySelectorAll('[name^="options["]').forEach(function (control) {
+                if (control.disabled) return;
+
+                var answered =
+                  control.type === 'checkbox' ? control.checked : control.value.trim() !== '';
+                var picked = control.tagName === 'SELECT' ? control.selectedOptions[0] : control;
+
+                if (answered && picked) total += Number(picked.getAttribute('data-price')) || 0;
+              });
+
+              if (money) price.textContent = money.format(total);
+            }
+
+            form.addEventListener('change', reprice);
+            form.addEventListener('input', reprice);
           }
 
           // Required options, checked here rather than by the browser: the

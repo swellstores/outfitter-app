@@ -3,6 +3,7 @@ import type { SwellData } from '@swell/apps-sdk';
 
 import Layout from '@/layouts/Layout.astro';
 import T from '@/components/T.astro';
+import { lineImage, optionsOf } from '@/lib/cart-json';
 import { formatMoney } from '@/lib/format';
 
 const { swell, cart, t } = Astro.locals;
@@ -11,20 +12,6 @@ const { currency, locale } = swell.getStorefrontLocalization();
 const items: SwellData[] = cart?.items ?? [];
 const count = Number(cart?.item_quantity) || 0;
 const discount = Number(cart?.discount_total) || 0;
-
-/** See the same function in lib/cart-json.ts, which the drawer uses. */
-function optionsOf(item: SwellData): string {
-  const options: SwellData[] = item.options ?? [];
-
-  return options
-    .filter((option: SwellData) => option?.value)
-    .map((option: SwellData) =>
-      option.variant || !option.name
-        ? String(option.value)
-        : `${option.name}: ${option.value}`,
-    )
-    .join(' · ');
-}
 
 // Set by the cart handler when a write was refused, so the page can say so
 // instead of looking as though nothing happened. A flag, not a message: a
@@ -36,7 +23,7 @@ const failed = Astro.url.searchParams.has('cart_error');
   <div class="container">
     <header class="page-head">
       <p class="eyebrow">
-        {count > 0 ? <>{count} {count === 1 ? <T id="cart_count_one" /> : <T id="cart_count_other" />}</> : <T id="cart_empty_eyebrow" />}
+        {count > 0 ? <>{count}{' '}{count === 1 ? <T id="cart_count_one" /> : <T id="cart_count_other" />}</> : <T id="cart_empty_eyebrow" />}
       </p>
       <h1 class="display"><T id="cart_title" /></h1>
     </header>
@@ -73,9 +60,9 @@ const failed = Astro.url.searchParams.has('cart_error');
             {items.map((item: SwellData) => (
               <li class="line">
                 <div class="line__media">
-                  {item.product?.images?.[0]?.file?.url && (
+                  {lineImage(item) && (
                     <img
-                      src={item.product.images[0].file.url}
+                      src={lineImage(item)}
                       alt={item.product?.name}
                       loading="lazy"
                     />

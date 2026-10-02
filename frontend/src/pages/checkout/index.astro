@@ -3,7 +3,7 @@ import type { SwellData } from '@swell/apps-sdk';
 
 import Layout from '@/layouts/Layout.astro';
 import T from '@/components/T.astro';
-import { optionsOf } from '@/lib/cart-json';
+import { lineImage, optionsOf } from '@/lib/cart-json';
 import { formatMoney } from '@/lib/format';
 
 const { swell, cart, t } = Astro.locals;
@@ -71,9 +71,9 @@ const checkoutUrl =
               items.map((item: SwellData) => (
                 <li class="line">
                   <div class="line__media">
-                    {item.product?.images?.[0]?.file?.url && (
+                    {lineImage(item) && (
                       <img
-                        src={item.product.images[0].file.url}
+                        src={lineImage(item)}
                         alt={item.product?.name}
                         loading="lazy"
                       />

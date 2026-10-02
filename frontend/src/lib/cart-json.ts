@@ -44,7 +44,7 @@ export function serializeCart(cart: SwellData | null | undefined): CartJson {
       product_id: item.product_id ?? null,
       name: item.product_name || item.product?.name || '',
       slug: item.product?.slug ?? null,
-      image: item.product?.images?.[0]?.file?.url ?? null,
+      image: lineImage(item),
       options: optionsOf(item),
       price: Number(item.price) || 0,
       price_total: Number(item.price_total) || 0,
@@ -55,21 +55,54 @@ export function serializeCart(cart: SwellData | null | undefined): CartJson {
 
 /**
  * What the shopper chose, as one line. A variant option is its value alone —
- * "Large" needs no label — but anything else is named, because "Eric" on its
- * own in a cart line says nothing about what it is.
+ * "Large" needs no label — and a ticked toggle is its option's name alone,
+ * since its value only restates the checkbox. Anything else is named, because
+ * "Eric" on its own in a cart line says nothing about what it is.
  */
 export function optionsOf(item: SwellData): string {
   const options: SwellData[] = item.options ?? [];
 
   const parts = options
     .filter((option) => option?.value)
-    .map((option) =>
-      option.variant || !option.name
-        ? String(option.value)
-        : `${option.name}: ${option.value}`,
-    );
+    .map((option) => {
+      if (option.variant || !option.name) {
+        return String(option.value);
+      }
+
+      return isToggle(productOption(item, option.id))
+        ? String(option.name)
+        : `${option.name}: ${option.value}`;
+    });
 
   return parts.length > 0 ? parts.join(' · ') : item.variant?.name || '';
+}
+
+/**
+ * The line's picture: the chosen colourway's, when an option value carries
+ * one — the same photo the product page swapped to — else the product's own.
+ */
+export function lineImage(item: SwellData): string | null {
+  for (const option of (item.options ?? []) as SwellData[]) {
+    const value = (productOption(item, option?.id)?.values ?? []).find(
+      (candidate: SwellData) => candidate?.id === option?.value_id,
+    );
+
+    if (typeof value?.image?.url === 'string' && value.image.url) {
+      return value.image.url;
+    }
+  }
+
+  return item.product?.images?.[0]?.file?.url ?? null;
+}
+
+function productOption(item: SwellData, id: unknown): SwellData | undefined {
+  return (item.product?.options ?? []).find(
+    (option: SwellData) => option?.id === id,
+  );
+}
+
+function isToggle(option: SwellData | undefined): boolean {
+  return option?.input_type === 'toggle' || option?.input_type === 'checkbox';
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
