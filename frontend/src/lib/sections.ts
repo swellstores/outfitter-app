@@ -679,13 +679,13 @@ export const SECTION_TYPES: SectionTypeDef[] = [
     ],
     template: {
       eyebrow: 'How it works',
-      heading: 'Three steps, then the post.',
+      heading: 'Three steps, then it ships.',
       title_a: 'Pick the piece',
-      text_a: 'Tees, hoodies, hats, mugs — choose the blank and the colour.',
+      text_a: 'Tees, hoodies, hats, mugs — choose the blank and the color.',
       title_b: 'Add your mark',
       text_b: 'Upload the artwork once; it sits on every product you pick.',
       title_c: 'We print and ship',
-      text_c: 'Each order is printed on demand and posted within a few days.',
+      text_c: 'Each order is printed on demand and shipped within a few days.',
     },
   },
   {
@@ -845,8 +845,8 @@ export const SECTION_TYPES: SectionTypeDef[] = [
     ],
     template: {
       eyebrow: 'New this season',
-      heading: 'The autumn drop.',
-      body: 'Heavier fleece, three new colours, the same print.',
+      heading: 'The fall drop.',
+      body: 'Heavier fleece, three new colors, the same print.',
       image: '',
       cta_label: 'Shop the drop',
       cta_url: '/',
