@@ -45,3 +45,32 @@ export function formatDate(value: unknown, locale = FALLBACK_LOCALE): string {
     return date.toISOString().slice(0, 10);
   }
 }
+
+/**
+ * HTML to one line of plain text, cut at a word to at most `max` characters —
+ * a rich description turned into a meta description.
+ */
+export function plainText(html: unknown, max = 160): string {
+  if (typeof html !== 'string') {
+    return '';
+  }
+
+  const text = html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (text.length <= max) {
+    return text;
+  }
+
+  const cut = text.slice(0, max - 1);
+
+  return `${cut.slice(0, cut.lastIndexOf(' ') > 0 ? cut.lastIndexOf(' ') : cut.length)}…`;
+}

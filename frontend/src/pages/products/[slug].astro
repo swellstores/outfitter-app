@@ -4,6 +4,7 @@ import type { SwellData } from '@swell/apps-sdk';
 import Layout from '@/layouts/Layout.astro';
 import Sections from '@/components/sections/Sections.astro';
 import T from '@/components/T.astro';
+import { plainText } from '@/lib/format';
 
 const { swell, t } = Astro.locals;
 const { slug } = Astro.params;
@@ -21,7 +22,10 @@ if (!product) {
 
 <Layout
   title={product?.name || t('product_not_found_page_title')}
-  description={product?.meta_description || product?.name}
+  description={
+    product?.meta_description || plainText(product?.description) || product?.name
+  }
+  image={product?.images?.[0]?.file?.url}
 >
   <div class="container">
     {
