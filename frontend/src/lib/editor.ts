@@ -2,9 +2,11 @@ import type { Swell, SwellData } from '@swell/apps-sdk';
 import type { APIContext, AstroGlobal } from 'astro';
 
 import panel from '../../../settings/outfitter.json';
+import manifest from '../../../swell.json';
 import { safeColor } from './color';
 import type { ContentField, ContentPage } from './content';
 import type { SectionTypeDef, StoredSection } from './sections';
+import { verifySwellContext } from './swell-context';
 
 /**
  * What the editor shell and its API share: the gate, the storefront's settings
@@ -107,16 +109,15 @@ export interface EditorState {
 }
 
 /**
- * The cookie the Swell gateway sets once it has validated a dashboard session
- * (see handleAppAdminSession in the admin proxy). Its value is the session id.
+ * Who may sign a Swell-Context this app trusts: Swell production and staging,
+ * and under `swell app dev` a local Swell as well. Fixed here, never read from
+ * the request.
  */
-export const ADMIN_SESSION_COOKIE = '_swell_admin_session';
-
-/** A validated session is reused for this long rather than re-checked. */
-const SESSION_CACHE_TTL_MS = 60000;
-
-/** Keyed by `${storeId}:${sessionId}` -- never by session alone. */
-const sessionChecks = new Map<string, { valid: boolean; at: number }>();
+const CONTEXT_ISSUERS: readonly string[] = [
+  'https://swell.store',
+  'https://dev.swell.store',
+  ...(import.meta.env.DEV ? ['http://swell.test:4001'] : []),
+];
 
 /** Whether Swell marks the request as editor or preview — a hint, not a credential. */
 export function isEditorMode(swell: Swell): boolean {
@@ -128,12 +129,11 @@ export function isEditorMode(swell: Swell): boolean {
  *
  * Editor and preview mode are a hint, not a credential: the proxy derives them
  * from the hostname alone, and a store's test environment runs in preview on a
- * public URL. The credential is `_swell_admin_session`, which the gateway sets
- * only after checking the dashboard session it was handed. Presence is not
- * enough — the cookie is readable and writable by script on that public host —
- * so the value is checked on every request, against the admin API, which
- * answers for the session the id names. A session that belongs to another
- * store is refused: the cookie travels on a host this store shares.
+ * public URL. The credential is the signed Swell-Context the proxy sends with
+ * the request (see lib/swell-context.ts), which names an admin only when a
+ * signed-in admin of the store made it — and, for a write, only when it came
+ * from the storefront's own pages. Its store and storefront must be the ones
+ * this request is for.
  *
  * Anything else, a live storefront included, is told nothing exists here.
  */
@@ -146,58 +146,78 @@ export async function isEditorRequest(
     return false;
   }
 
-  const sessionId = context.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   const storeId = String(swell.swellHeaders?.['store-id'] ?? '');
-  const adminUrl = String(swell.swellHeaders?.['admin-url'] ?? '');
 
-  if (!sessionId || !storeId || !adminUrl) {
+  if (!storeId) {
+    return false;
+  }
+
+  const signed = await verifySwellContext(
+    context.request.headers.get('swell-context'),
+    { audience: manifest.id, issuers: CONTEXT_ISSUERS },
+  );
+
+  if (
+    signed?.admin &&
+    signed.store_id === storeId &&
+    (!signed.storefront_id ||
+      signed.storefront_id === swell.swellHeaders?.['storefront-id'])
+  ) {
+    return true;
+  }
+
+  return import.meta.env.DEV && (await hasDevAdminSession(context, storeId));
+}
+
+/**
+ * `swell app dev` only. Swell never names an admin in the context of a local
+ * storefront preview — any visitor to the preview link would be one — so the
+ * editor falls back to the dashboard session cookie the proxy still sets,
+ * checked against the admin API. Production builds compile this out; it goes
+ * when Swell either stops setting the cookie or names the admin locally.
+ */
+const DEV_ADMIN_SESSION_COOKIE = '_swell_admin_session';
+
+const devSessionChecks = new Map<string, { valid: boolean; at: number }>();
+
+async function hasDevAdminSession(
+  context: AstroGlobal | APIContext,
+  storeId: string,
+): Promise<boolean> {
+  const sessionId = context.cookies.get(DEV_ADMIN_SESSION_COOKIE)?.value;
+  const adminUrl = String(context.locals.swell.swellHeaders?.['admin-url'] ?? '');
+
+  if (!sessionId || !adminUrl) {
     return false;
   }
 
   const key = `${storeId}:${sessionId}`;
-  const cached = sessionChecks.get(key);
+  const cached = devSessionChecks.get(key);
 
-  if (cached && Date.now() - cached.at < SESSION_CACHE_TTL_MS) {
+  if (cached && Date.now() - cached.at < 60000) {
     return cached.valid;
   }
 
-  const valid = await checkAdminSession(adminUrl, sessionId, storeId);
+  let valid = false;
 
-  sessionChecks.set(key, { valid, at: Date.now() });
-
-  return valid;
-}
-
-/**
- * Ask the admin API who the session belongs to. It answers `{}` for a session
- * it does not know, so a signed-in user of this store is the only shape that
- * passes. Never throws: an editor that cannot verify stays shut.
- */
-async function checkAdminSession(
-  adminUrl: string,
-  sessionId: string,
-  storeId: string,
-): Promise<boolean> {
   try {
     const response = await fetch(
       new URL('/admin/api/session', adminUrl).toString(),
       { headers: { 'x-session': sessionId } },
     );
+    const session: unknown = response.ok ? await response.json() : null;
 
-    if (!response.ok) {
-      return false;
-    }
-
-    const session: unknown = await response.json();
-
-    return (
+    valid =
       isRecord(session) &&
       Boolean(session.user_id) &&
-      session.client_id === storeId
-    );
+      session.client_id === storeId;
   } catch {
-    return false;
+    valid = false;
   }
+
+  devSessionChecks.set(key, { valid, at: Date.now() });
+
+  return valid;
 }
 
 /** The storefront whose settings document the editor reads and writes. */

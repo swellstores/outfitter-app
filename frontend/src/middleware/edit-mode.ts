@@ -8,8 +8,8 @@ import { isEditorRequest } from '@/lib/editor';
  * Decides whether this render is an editing one.
  *
  * Edit mode needs two things at once: the `__edit` flag on the URL and a
- * request the editor gate accepts — editor or preview mode with a valid
- * dashboard session. The flag alone does nothing, so a shopper who finds it
+ * request the editor gate accepts — editor or preview mode, with a signed
+ * context naming an admin. The flag alone does nothing, so a shopper who finds it
  * sees the ordinary page.
  *
  * This runs before the page cache on purpose: an editing render is never

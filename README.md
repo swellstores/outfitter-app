@@ -120,10 +120,17 @@ All three live in **one document** per storefront: `/:storefronts/{id}/configs/s
 `postMessage` (`lib/edit-client.ts` is the preview side). It writes through three
 routes under `pages/editor/api/` — `state`, `sections`, `content`.
 
-Access needs editor or preview mode **and** a dashboard session cookie that the
-admin API confirms. Mode alone is not a credential: a store's test environment
-runs in preview on a public URL. Open it from the dashboard; hitting `/editor`
-directly just redirects you to `/`.
+Access needs editor or preview mode **and** a signed `Swell-Context` header that
+names an admin of the store. The proxy signs it (ES256, 60 seconds) and adds the
+admin only when a signed-in admin made the request; `lib/swell-context.ts`
+verifies it against the issuer's published keys. Mode alone is not a
+credential: a store's test environment runs in preview on a public URL. Open
+the editor from the dashboard; hitting `/editor` directly just redirects you
+to `/`.
+
+Under `swell app dev` the context of a local storefront preview never names an
+admin, so dev builds also accept the dashboard session cookie the proxy sets,
+checked against the admin API. Production builds leave that path out.
 
 ## Recipes
 

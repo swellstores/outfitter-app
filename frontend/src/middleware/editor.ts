@@ -7,8 +7,8 @@ import { isEditorRequest, isJsonRequest } from '@/lib/editor';
  * Gates everything under `/editor` — the shell and its API alike.
  *
  * The editor is a merchant tool, so it only exists on requests the editor
- * gate accepts: editor or preview mode, carrying a dashboard session this
- * store's admin API confirms (see `isEditorRequest`). For everyone else the
+ * gate accepts: editor or preview mode, with a signed Swell-Context naming an
+ * admin of this store (see `isEditorRequest`). For everyone else the
  * path is rewritten to one that matches no route, so the response is the
  * ordinary 404 page: not a 403 that confirms there is something here to be
  * denied.
@@ -18,8 +18,10 @@ import { isEditorRequest, isJsonRequest } from '@/lib/editor';
  * unknown path, exactly as they would for any other.
  *
  * A write from another site is refused as well. Any page the merchant has
- * open could post here with their session — another `*.swell.store` tenant
- * included, which is same-site, so SameSite cookies do not help. Two signals
+ * open could post here with their cookies — another `*.swell.store` tenant
+ * included, which is same-site, so SameSite cookies do not help. The proxy
+ * already leaves the admin out of a cross-site write's context; this is the
+ * app's own check on top of it. Two signals
  * survive the proxy: a JSON content type makes the request one a browser must
  * preflight, and this app never answers a preflight; and `Origin` must be
  * this storefront's own host, which the proxy names in
