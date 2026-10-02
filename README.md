@@ -87,6 +87,7 @@ the request is not its business:
 | | |
 | --- | --- |
 | `initContext` | every request. Builds the Swell client from the proxy headers, sets `locals.swell` and `locals.tenant`. 503s a direct hit. |
+| `bodyLimit` | any request with a body. 411 without a Content-Length, 413 over the path's cap (64KB, more for the editor's sections and uploads) |
 | `editMode` | sets `locals.editMode` when the URL carries `__edit` **and** the request passes the editor gate |
 | `htmlCache` | serves and stores the edge-cached HTML |
 | `editor` | gates `/editor` and `/editor/api/*` |
@@ -110,7 +111,7 @@ edit mode wraps it in a `[data-edit]` span — that span is what makes it clicka
 in the editor.
 
 **Settings** — `settings/outfitter.json`, read at runtime via `lib/app-settings.ts`
-(memoised 60s per tenant).
+(memoised 60s per storefront).
 
 All three live in **one document** per storefront: `/:storefronts/{id}/configs/settings`.
 

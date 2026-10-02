@@ -4,11 +4,16 @@ import {
   DEFAULT_CACHE_RULES,
   type CacheRules,
   type HtmlCache,
+  type Swell,
 } from '@swell/apps-sdk';
 
-import { tenantKey } from '@/swell';
+import { getCookie, tenantKey } from '@/swell';
 import { getAppSettings } from '@/lib/app-settings';
-import { deploymentMode, isCacheablePageRequest } from '@/lib/cacheable';
+import {
+  deploymentMode,
+  isCacheablePageRequest,
+  isDegraded,
+} from '@/lib/cacheable';
 
 /**
  * Stale-while-revalidate for rendered pages, on the SDK's HtmlCache with the
@@ -21,7 +26,19 @@ import { deploymentMode, isCacheablePageRequest } from '@/lib/cacheable';
  * This is only safe because pages carry no per-visitor state: the cart count
  * and drawer are hydrated client-side from /cart.json, and every path that is
  * personal (cart, checkout, account) is excluded below. The SDK's cache key
- * covers store, currency, locale and deploy epoch, not the shopper's session.
+ * covers storefront, deployment mode, currency, locale and deploy epoch — and
+ * the shopper's account and cart, which the proxy sends in
+ * Swell-Storefront-Context. Visitors with neither share one context and so one
+ * entry; a shopper with a cart or a login gets entries of their own, which
+ * are rarely hit. That is the price of keeping account-group prices, which the
+ * render asks for with a signed-in shopper's session, out of shared pages.
+ * With no account in the context the render goes without the session (see
+ * `initSwell`), whose locale and currency the key cannot see.
+ *
+ * The app's settings are not in the key. A save in the editor reaches the
+ * live store as each page goes stale, like a product or price change — and a
+ * revalidation in an isolate still holding the old settings in its one-minute
+ * memo stores them for one more TTL.
  */
 
 export const DEFAULT_TTL_SECONDS = 60;
@@ -30,6 +47,16 @@ const SWR_SECONDS = 60 * 60 * 24; // a day — beyond this a stale page is re-re
 // keeps an entry until `ttl + swr` has passed, so an absurd value would pin a
 // page — a forged one included — until the next deploy.
 const MAX_TTL_SECONDS = SWR_SECONDS;
+
+// The SDK's key falls back to USD and en-US when the shopper has chosen
+// neither, but the render falls back to the store's defaults, which need not
+// be those. No choice gets a key of its own.
+const NO_CHOICE = '~default';
+
+// Carries the tenant key on this worker's own fallback revalidation (see
+// `revalidate`). The key digests the access token, which only the proxy and
+// this worker hold, so no client can produce it.
+const REVALIDATION_HEADER = 'x-outfitter-revalidation';
 
 const SKIP: CacheRules['pathRules'] = [
   { path: '/cart', skip: true },
@@ -74,9 +101,22 @@ export const htmlCache: MiddlewareHandler = async (context, next) => {
     return next();
   }
 
-  const request = cacheableRequest(context.request);
+  // A page the cache stores is rendered from fresh reads. Otherwise the SDK
+  // answers from its memo of whatever this isolate fetched last, kept for a
+  // week and refreshed only after the render, and a revalidation would store
+  // last hour's price as fresh. The header is the SDK's own switch for that,
+  // read at each call; it goes on the client only, so the cache sees the
+  // request as sent. Set here, past every check that turns the cache off, so
+  // a store with the cache off keeps the memo.
+  context.locals.swell.headers['x-cache-bypass'] = 'revalidation';
+
+  const request = cacheableRequest(context);
+  // A revalidation skips the read and always writes. The proxy passes
+  // X-Cache-Bypass through from any client, so it only counts alongside a
+  // value that takes this store's access token to produce.
   const isRevalidation =
-    context.request.headers.get('X-Cache-Bypass') === 'revalidation';
+    context.request.headers.get('X-Cache-Bypass') === 'revalidation' &&
+    context.request.headers.get(REVALIDATION_HEADER) === tenantKey(context);
 
   if (!isRevalidation && cache.canReadFromCache(request)) {
     const cached = await cache.getWithConditionals(request);
@@ -92,8 +132,8 @@ export const htmlCache: MiddlewareHandler = async (context, next) => {
         // the public URL, goes back out through the proxy and lands wherever
         // that routes, which need not be here. Kept only as a fallback.
         ctx.waitUntil(
-          revalidateInPlace(cache, request, next).catch(() =>
-            revalidate(cache, context.request),
+          revalidateInPlace(cache, request, context.locals.swell, next).catch(
+            () => revalidate(cache, context.request, tenantKey(context)),
           ),
         );
       }
@@ -119,6 +159,12 @@ export const htmlCache: MiddlewareHandler = async (context, next) => {
   const body = await response.text();
   const headers = stripEncoding(response.headers);
   const init = { status: response.status, statusText: response.statusText };
+
+  // Asked once the body is read, when every read of the render is done.
+  if (isDegraded(context.locals.swell)) {
+    headers.set('X-Cache-Status', 'BYPASS');
+    return new Response(body, { ...init, headers });
+  }
 
   if (ctx?.waitUntil) {
     ctx.waitUntil(
@@ -162,23 +208,21 @@ function clampTtl(seconds: number): number {
  * which the epoch already covers — so the deployment mode stands in for the
  * hash (the SDK's key does not otherwise separate preview from live, and a
  * shared key would serve test-environment pages to live shoppers), and the
- * store id stands in for the
- * storefront id, when the proxy sends neither. Both only ever feed the key.
+ * store id stands in for the storefront id when the proxy sends none. Both
+ * only ever feed the key. The hash is set even over one the request carries:
+ * the proxy sends none for a storefront without a theme, so that one came
+ * from the client.
  */
-function cacheableRequest(request: Request): Request {
+function cacheableRequest(context: APIContext): Request {
+  const { request } = context;
   const headers = new Headers(request.headers);
-  let changed = false;
 
-  if (!headers.get('swell-theme-version-hash')) {
-    headers.set('swell-theme-version-hash', `self:${deploymentMode(request)}`);
-    changed = true;
-  }
+  headers.set('swell-theme-version-hash', `self:${deploymentMode(request)}`);
 
   if (!headers.get('swell-storefront-id')) {
     const storeId = headers.get('swell-store-id');
     if (storeId) {
       headers.set('swell-storefront-id', storeId);
-      changed = true;
     }
   }
 
@@ -187,19 +231,30 @@ function cacheableRequest(request: Request): Request {
   // would file one locale's page under another's key, for every shopper. The
   // proxy passes the header through and this app never reads it: the key
   // follows the cookie, as the render does.
-  if (headers.has('x-locale')) {
-    headers.delete('x-locale');
-    changed = true;
-  }
+  headers.delete('x-locale');
 
-  return changed
-    ? new Request(request.url, { method: request.method, headers })
-    : request;
+  // The SDK finds the cookie with a pattern of its own, which matches inside
+  // another cookie's name and misses one written `swell-data =`; the render
+  // reads it with Astro's parser. A request crafted to tell them apart would
+  // file one currency's page under another's key. So the key is given exactly
+  // what the render will read, and nothing else.
+  headers.set(
+    'cookie',
+    `swell-data=${encodeURIComponent(
+      JSON.stringify({
+        'swell-currency': getCookie(context, 'swell-currency') || NO_CHOICE,
+        'swell-locale': getCookie(context, 'swell-locale') || NO_CHOICE,
+      }),
+    )}`,
+  );
+
+  return new Request(request.url, { method: request.method, headers });
 }
 
 async function revalidateInPlace(
   cache: HtmlCache,
   request: Request,
+  swell: Swell,
   next: () => Promise<Response>,
 ): Promise<void> {
   const fresh = await next();
@@ -210,6 +265,11 @@ async function revalidateInPlace(
   }
 
   const body = await fresh.text();
+
+  if (isDegraded(swell)) {
+    return;
+  }
+
   await cache.put(
     request,
     new Response(body, {
@@ -220,9 +280,16 @@ async function revalidateInPlace(
   );
 }
 
-async function revalidate(cache: HtmlCache, request: Request): Promise<void> {
+async function revalidate(
+  cache: HtmlCache,
+  request: Request,
+  tenant: string,
+): Promise<void> {
+  const revalidation = cache.createRevalidationRequest(request);
+  revalidation.headers.set(REVALIDATION_HEADER, tenant);
+
   try {
-    await fetch(cache.createRevalidationRequest(request), {
+    await fetch(revalidation, {
       // @ts-expect-error `cf` is Cloudflare-specific; keep the CDN out of it.
       cf: { cacheTtl: 0, cacheEverything: false },
     });

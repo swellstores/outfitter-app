@@ -3,6 +3,7 @@ import { tenantKey } from '@/swell';
 import { getAppSettings } from '@/lib/app-settings';
 import { isLightColor, safeColor } from '@/lib/color';
 import { localizationOptions } from '@/lib/localization';
+import { keyedSearch } from '@/lib/cacheable';
 import EditClient from '@/components/EditClient.astro';
 import T from '@/components/T.astro';
 
@@ -43,7 +44,7 @@ const store = settings?.state?.store;
 const locales = localizationOptions(store?.locale, store?.locales);
 const currencies = localizationOptions(store?.currency, store?.currencies);
 const localization = locales.length > 1 || currencies.length > 1;
-const here = `${Astro.url.pathname}${Astro.url.search}`;
+const here = `${Astro.url.pathname}${keyedSearch(Astro.url)}`;
 
 // support_email is not ours to ask for — Swell already collects one in the
 // store's own settings, so the footer sources it there or shows nothing.

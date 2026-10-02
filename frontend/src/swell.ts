@@ -8,7 +8,7 @@ import {
 import type { AstroGlobal, APIContext, AstroCookieSetOptions } from 'astro';
 
 import swellConfig from '../../swell.json';
-import { isCacheablePageRequest } from '@/lib/cacheable';
+import { isCacheablePageRequest, markDegraded } from '@/lib/cacheable';
 
 // Every value the SDK stores as a "cookie" is a key inside this one JSON cookie.
 const SWELL_DATA_COOKIE = 'swell-data';
@@ -26,7 +26,9 @@ const defaultCookieOptions: AstroCookieSetOptions = {
  * alone does not either: it is public, and the worker is reachable directly,
  * so a request carrying someone else's id would share their bucket. The
  * access token is the one header only the proxy knows, so a digest of it is
- * part of the key. Computed once per request by `initContext`.
+ * part of the key. So is the storefront id: a store can run this app on more
+ * than one storefront, all under the same token, and each has its own
+ * settings document. Computed once per request by `initContext`.
  */
 export function tenantKey(context: AstroGlobal | APIContext): string {
   return context.locals.tenant;
@@ -36,6 +38,8 @@ export async function computeTenantKey(
   context: AstroGlobal | APIContext,
 ): Promise<string> {
   const storeId = context.request.headers.get('swell-store-id') ?? '';
+  const storefrontId =
+    context.request.headers.get('swell-storefront-id') ?? '';
   const token = context.request.headers.get('swell-access-token') ?? '';
   const digest = await crypto.subtle.digest(
     'SHA-256',
@@ -45,7 +49,7 @@ export async function computeTenantKey(
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 
-  return `store:${storeId}:${hex.slice(0, 16)}`;
+  return `store:${storeId}:${storefrontId}:${hex.slice(0, 16)}`;
 }
 
 /**
@@ -62,7 +66,17 @@ export function initSwell(
   const runtime = context.locals.runtime;
   const serverHeaders = new Headers(context.request.headers);
 
-  return new Swell({
+  // A page the cache shares is rendered without the shopper's session unless
+  // the proxy's storefront context names their account. The cache key covers
+  // that context and nothing else of the session, yet the API falls back to
+  // the locale and currency a session carries — so a session with no account
+  // would render one shopper's choice into the entry every new visitor reads.
+  // A signed-in shopper's context keys their pages apart, and their session
+  // gets them their account's prices.
+  const withholdSession =
+    isCacheablePageRequest(context.request) && !namesAccount(context.request);
+
+  const swell = new Swell({
     url: context.url,
     // Double cast because the SDK's SwellAppConfig hardcodes
     // `storefront.theme.provider: 'app'` and never models `'self'`. The client
@@ -72,6 +86,10 @@ export function initSwell(
     workerEnv: runtime?.env as unknown as CFThemeEnv,
     workerCtx: runtime?.ctx as unknown as CFWorkerContext,
     getCookie(name: string) {
+      if (name === 'swell-session' && withholdSession) {
+        return undefined;
+      }
+
       return getCookie(context, name);
     },
     setCookie(
@@ -95,6 +113,53 @@ export function initSwell(
     },
     ...options,
   });
+
+  // swell-js sends the shopper's locale and currency as headers, and the SDK
+  // leaves headers out of its memo key, so one locale's products could answer
+  // for another's — from the memo, or from a concurrent read it shares. Passed
+  // as options as well they are part of the key. swell-js reads them from
+  // there first, and they are the values it would have read from the cookie.
+  // The storefront id is there for the key alone, and swell-js ignores it: the
+  // SDK's key leaves it out, though /settings/all differs from one storefront
+  // to the next.
+  //
+  // A read that fails marks the render degraded. swell-js answers a missing
+  // record with null, so a rejection is the API failing, and the sections
+  // that swallow it would otherwise store an empty grid for every visitor.
+  const request = swell.storefront.request;
+
+  swell.storefront.request = <T>(
+    method: string,
+    url: string,
+    id?: string,
+    data?: unknown,
+    opt?: unknown,
+  ) =>
+    request<T>(method, url, id, data, {
+      locale: getCookie(context, 'swell-locale'),
+      currency: getCookie(context, 'swell-currency'),
+      storefrontId: swell.swellHeaders['storefront-id'],
+      ...(opt as object | undefined),
+    }).catch((err: unknown) => {
+      markDegraded(swell);
+      throw err;
+    });
+
+  return swell;
+}
+
+/**
+ * Whether the proxy's storefront context names a signed-in account. A context
+ * that is missing or will not parse names none.
+ */
+function namesAccount(request: Request): boolean {
+  const value = request.headers.get('swell-storefront-context');
+
+  try {
+    return Boolean(value && JSON.parse(decodeURIComponent(value))?.account);
+  } catch {
+    return false;
+  }
 }
 
 export function isResponseSent(request: Request): boolean {

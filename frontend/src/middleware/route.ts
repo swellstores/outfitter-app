@@ -1,6 +1,7 @@
 import type { APIContext, MiddlewareHandler } from 'astro';
 
 import { computeTenantKey, initSwell } from '@/swell';
+import { markDegraded } from '@/lib/cacheable';
 
 // Assets (`/favicon.svg`, `/_astro/*`, `/_image`), the JSON routes and the
 // editor shell render no storefront page, so they skip hydration and its API
@@ -65,10 +66,16 @@ export const hydratePage: MiddlewareHandler = async (context, next) => {
   const { swell } = context.locals;
 
   // Currency, locale and store name for the layout. Never throws: a page that
-  // cannot read the store's settings still renders, with the app's own.
+  // cannot read the store's settings still renders, with the app's own, but
+  // is not cached.
   context.locals.settings = await swell
     .getStorefrontSettings()
     .catch(() => undefined);
+
+  // The SDK swallows a failed read and hands back settings with nothing in.
+  if (!context.locals.settings?.state?.store) {
+    markDegraded(swell);
+  }
 
   return next();
 };
