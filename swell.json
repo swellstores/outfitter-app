@@ -18,7 +18,11 @@
 	"preview_mobile_src": "assets/preview-mobile.png",
 	"support_email": "support@swell.is",
 	"price": 0,
-	"permissions": [],
+	"permissions": [
+		"write_:storefronts",
+		"write_:files",
+		"write_files"
+	],
 	"storefront": {
 		"editor": {
 			"label": "Open editor",
