@@ -14,7 +14,7 @@
       "label": "Logo",
       "type": "image",
       "admin_span": 2,
-      "description": "Replaces the store name in the header. A transparent PNG or SVG works best — the header sits over the page with no background of its own."
+      "description": "Replaces the store name in the header. A transparent PNG works best — the header sits over the page with no background of its own."
     },
     {
       "type": "field_row",
