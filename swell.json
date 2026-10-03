@@ -17,6 +17,7 @@
 	"preview_src": "assets/preview.png",
 	"preview_mobile_src": "assets/preview-mobile.png",
 	"support_email": "support@swell.is",
+	"documentation_url": "https://developers.swell.is/app-guides/outfitter",
 	"price": 0,
 	"permissions": [
 		"write_:storefronts",
