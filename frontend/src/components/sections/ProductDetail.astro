@@ -7,6 +7,7 @@ import T from '@/components/T.astro';
 import { getAppSettings } from '@/lib/app-settings';
 import { formatMoney } from '@/lib/format';
 import { optionPrice, productOptions } from '@/lib/product-options';
+import type { ProductOption } from '@/lib/product-options';
 import type { Section } from '@/lib/sections';
 
 /**
@@ -35,6 +36,18 @@ const images: SwellData[] = (product.images ?? []).slice(0, 4);
 // a name to print. The variant is resolved by the API from the values posted,
 // so this page never picks one — see lib/product-options.ts.
 const options = productOptions(product);
+
+// A select with one value is no choice: it is answered for the shopper and
+// kept out of sight, but still posted, since a variant option is how the API
+// finds the variant. Not a conditional one: hiding its parent clears it, and
+// out of sight it could not be answered again.
+const fixed = (option: ProductOption) =>
+  option.input === 'select' && option.values.length === 1 && !option.parentId;
+
+// What those answers add, so the price on the page is the one charged.
+const fixedPrice = options
+  .filter(fixed)
+  .reduce((sum, option) => sum + option.values[0].price, 0);
 
 // What the dashboard calls this product's related products: its up-sells, in
 // the merchant's own order. Swell has no related-products endpoint — up_sells
@@ -86,7 +99,7 @@ const soldOut =
         data-base={product.price}
         data-currency={currency}
         data-locale={locale}
-      >{formatMoney(product.price, currency, locale)}</span>
+      >{formatMoney(Number(product.price) + fixedPrice, currency, locale)}</span>
     </p>
 
     {/* data-* carries what the drawer shows before the server answers.
@@ -110,7 +123,7 @@ const soldOut =
 
         return (
         <div
-          class="field"
+          class:list={['field', fixed(option) && 'field--fixed']}
           data-option={option.id}
           data-option-variant={option.variant ? '' : undefined}
           data-option-parent={option.parentId || undefined}
@@ -142,8 +155,11 @@ const soldOut =
               aria-describedby={describedBy}
             >
               {/* An empty first row is what makes `required` mean anything on
-                  a select: without it the first value is already chosen. */}
-              <option value="">{option.hint || t('product_option_choose')}</option>
+                  a select: without it the first value is already chosen,
+                  which is how a fixed option comes answered. */}
+              {!fixed(option) && (
+                <option value="">{option.hint || t('product_option_choose')}</option>
+              )}
               {option.values.map((value) => (
                 <option
                   value={value.id}

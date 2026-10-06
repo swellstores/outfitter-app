@@ -2165,6 +2165,13 @@ function styleFor(tokens: Record<string, unknown>): string | undefined {
     display: none;
   }
 
+  /* An option with one value, answered for the shopper. A class rather than
+     `hidden`, which the cart drawer reads as "not asked" and leaves out of the
+     line it shows; this answer is posted, so the line must name it. */
+  .field--fixed {
+    display: none;
+  }
+
   .pdp__block {
     width: 100%;
     padding-top: 1.75rem;
