@@ -1,5 +1,5 @@
-// Bindings declared in wrangler.jsonc. No KV: this app renders its own markup
-// and has no theme cache to store.
+// Bindings declared in wrangler.jsonc. The KV namespace holds the page cache.
 interface Env {
   ASSETS: import('@cloudflare/workers-types').Fetcher;
+  NAMESPACE: import('@cloudflare/workers-types').KVNamespace;
 }

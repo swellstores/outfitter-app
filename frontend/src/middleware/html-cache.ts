@@ -16,12 +16,14 @@ import {
 } from '@/lib/cacheable';
 
 /**
- * Stale-while-revalidate for rendered pages, on the SDK's HtmlCache with the
- * Worker (Cache API) backend — no KV namespace needed.
+ * Stale-while-revalidate for rendered pages, on the SDK's HtmlCache: in the
+ * deployment's KV namespace, shared by every data center, or the Workers Cache
+ * API when no namespace is bound.
  *
- * A hit is served from the edge cache with no API calls at all; once the entry
- * is older than the TTL it is still served immediately and refreshed in the
- * background, so a shopper never waits on a render after the first one.
+ * A hit is served with no API calls at all — not even the settings read that
+ * gives the TTL, which a stored page carries — and once the entry is older
+ * than its TTL it is still served immediately and refreshed in the background,
+ * so a shopper never waits on a render after the first one.
  *
  * This is only safe because pages carry no per-visitor state: the cart count
  * and drawer are hydrated client-side from /cart.json, and every path that is
@@ -58,7 +60,7 @@ const NO_CHOICE = '~default';
 // this worker hold, so no client can produce it.
 const REVALIDATION_HEADER = 'x-outfitter-revalidation';
 
-const SKIP: CacheRules['pathRules'] = [
+const SKIP: NonNullable<CacheRules['pathRules']> = [
   { path: '/cart', skip: true },
   { path: '/cart.json', skip: true },
   { path: '/checkout', skip: true },
@@ -78,37 +80,19 @@ export const htmlCache: MiddlewareHandler = async (context, next) => {
     return next();
   }
 
-  const ttl = await resolveTtl(context, env?.HTML_CACHE_TTL);
-  if (ttl <= 0) {
-    return next();
-  }
-
   // Each deploy gets its own epoch, so a release never serves last week's HTML.
   const epoch = env?.CF_VERSION_METADATA?.id || env?.HTML_CACHE_EPOCH || 'v1';
 
-  const cache = getHtmlCache(
-    { HTML_CACHE_EPOCH: epoch, HTML_CACHE_BACKEND: 'worker' },
-    {
-      defaults: {
-        live: { ttl, swr: SWR_SECONDS },
-        preview: { ttl, swr: SWR_SECONDS },
-      },
-      pathRules: [...SKIP, ...(DEFAULT_CACHE_RULES.pathRules ?? [])],
-    },
-  );
+  // A stored page carries its own TTL and is judged by it, so reading needs
+  // none: the one given here is only what a write would use, and every write
+  // below resolves the real one first. Reading before resolving keeps the
+  // settings read — a round trip to the API whenever this isolate's memo has
+  // lapsed, which on a quiet store is most requests — off every hit.
+  const reader = cacheFor(env, epoch, DEFAULT_TTL_SECONDS);
 
-  if (!cache) {
+  if (!reader) {
     return next();
   }
-
-  // A page the cache stores is rendered from fresh reads. Otherwise the SDK
-  // answers from its memo of whatever this isolate fetched last, kept for a
-  // week and refreshed only after the render, and a revalidation would store
-  // last hour's price as fresh. The header is the SDK's own switch for that,
-  // read at each call; it goes on the client only, so the cache sees the
-  // request as sent. Set here, past every check that turns the cache off, so
-  // a store with the cache off keeps the memo.
-  context.locals.swell.headers['x-cache-bypass'] = 'revalidation';
 
   const request = cacheableRequest(context);
   // A revalidation skips the read and always writes. The proxy passes
@@ -118,8 +102,8 @@ export const htmlCache: MiddlewareHandler = async (context, next) => {
     context.request.headers.get('X-Cache-Bypass') === 'revalidation' &&
     context.request.headers.get(REVALIDATION_HEADER) === tenantKey(context);
 
-  if (!isRevalidation && cache.canReadFromCache(request)) {
-    const cached = await cache.getWithConditionals(request);
+  if (!isRevalidation && reader.canReadFromCache(request)) {
+    const cached = await reader.getWithConditionals(request);
 
     if (cached?.found && cached.response) {
       if (cached.notModified && cached.conditional304) {
@@ -127,20 +111,36 @@ export const htmlCache: MiddlewareHandler = async (context, next) => {
       }
 
       if (cached.stale && ctx?.waitUntil) {
-        // Render the fresh page in this isolate and write it to this colo's
-        // cache — the one serving the shopper. The SDK's alternative, re-fetching
-        // the public URL, goes back out through the proxy and lands wherever
-        // that routes, which need not be here. Kept only as a fallback.
+        // Render the fresh page in this isolate and store it. The SDK's
+        // alternative, re-fetching the public URL, goes back out through the
+        // proxy for a second render. Kept only as a fallback.
         ctx.waitUntil(
-          revalidateInPlace(cache, request, context.locals.swell, next).catch(
-            () => revalidate(cache, context.request, tenantKey(context)),
-          ),
+          resolveTtl(context, env?.HTML_CACHE_TTL)
+            .then((ttl) => {
+              // Turned off since the page was stored: drop it, rather than
+              // serve it stale for the rest of its day.
+              if (ttl <= 0) {
+                return reader.delete(request).then(() => undefined);
+              }
+
+              bypassMemo(context);
+              return revalidateInPlace(cacheFor(env, epoch, ttl)!, request, context.locals.swell, next);
+            })
+            .catch(() => revalidate(reader, context.request, tenantKey(context))),
         );
       }
 
       return cached.response;
     }
   }
+
+  const ttl = await resolveTtl(context, env?.HTML_CACHE_TTL);
+  if (ttl <= 0) {
+    return next();
+  }
+
+  const cache = cacheFor(env, epoch, ttl)!;
+  bypassMemo(context);
 
   const response = await next();
 
@@ -199,6 +199,40 @@ async function resolveTtl(
 
 function clampTtl(seconds: number): number {
   return Math.min(MAX_TTL_SECONDS, Math.max(0, Math.floor(seconds)));
+}
+
+/**
+ * The page cache for this deploy, storing pages fresh for `ttl`. KV when the
+ * deployment binds a namespace: one store for every data center, where the
+ * Cache API keeps one per data center and the proxy reaches this worker
+ * through several, so most requests found nothing.
+ */
+function cacheFor(env: ENV | undefined, epoch: string, ttl: number): HtmlCache | null {
+  return getHtmlCache(
+    env?.NAMESPACE
+      ? { HTML_CACHE_EPOCH: epoch, NAMESPACE: env.NAMESPACE }
+      : { HTML_CACHE_EPOCH: epoch, HTML_CACHE_BACKEND: 'worker' },
+    {
+      defaults: {
+        live: { ttl, swr: SWR_SECONDS },
+        preview: { ttl, swr: SWR_SECONDS },
+      },
+      pathRules: [...SKIP, ...(DEFAULT_CACHE_RULES.pathRules ?? [])],
+    },
+  );
+}
+
+/**
+ * A page the cache stores is rendered from fresh reads. Otherwise the SDK
+ * answers from its memo of whatever this isolate fetched last, kept for a week
+ * and refreshed only after the render, and a revalidation would store last
+ * hour's price as fresh. The header is the SDK's own switch for that, read at
+ * each call; it goes on the client only, so the cache sees the request as
+ * sent. Set only once a page is going to be stored, so a store with the cache
+ * off keeps the memo.
+ */
+function bypassMemo(context: APIContext): void {
+  context.locals.swell.headers['x-cache-bypass'] = 'revalidation';
 }
 
 /**

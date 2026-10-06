@@ -5,6 +5,7 @@ import Layout from '@/layouts/Layout.astro';
 import T from '@/components/T.astro';
 import { lineImage, optionsOf } from '@/lib/cart-json';
 import { formatMoney } from '@/lib/format';
+import { srcset, THUMB_WIDTHS } from '@/lib/image';
 
 const { swell, cart, t } = Astro.locals;
 const { currency, locale } = swell.getStorefrontLocalization();
@@ -63,6 +64,8 @@ const failed = Astro.url.searchParams.has('cart_error');
                   {lineImage(item) && (
                     <img
                       src={lineImage(item)}
+                      srcset={srcset(lineImage(item) ?? undefined, THUMB_WIDTHS)}
+                      sizes="96px"
                       alt={item.product?.name}
                       loading="lazy"
                     />

@@ -3,6 +3,7 @@ import type { SwellData } from '@swell/apps-sdk';
 
 import T from '@/components/T.astro';
 import { formatMoney } from '@/lib/format';
+import { PRODUCT_WIDTHS, srcset } from '@/lib/image';
 import type { Section } from '@/lib/sections';
 
 /**
@@ -46,7 +47,15 @@ const href = product ? `/products/${product.slug || product.id}` : '/';
   data-section-type="product_spotlight"
 >
   <div class="sec__media">
-    {image && <img src={image} alt={product?.name} loading="lazy" />}
+    {image && (
+      <img
+        src={image}
+        srcset={srcset(image, PRODUCT_WIDTHS)}
+        sizes="(min-width: 900px) 50vw, 100vw"
+        alt={product?.name}
+        loading="lazy"
+      />
+    )}
   </div>
 
   <div class="sec__lead">

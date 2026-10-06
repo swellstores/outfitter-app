@@ -6,6 +6,7 @@ import ProductCard from '@/components/ProductCard.astro';
 import T from '@/components/T.astro';
 import { getAppSettings } from '@/lib/app-settings';
 import { formatMoney } from '@/lib/format';
+import { PRODUCT_WIDTHS, srcset } from '@/lib/image';
 import { optionPrice, productOptions } from '@/lib/product-options';
 import type { ProductOption } from '@/lib/product-options';
 import type { Section } from '@/lib/sections';
@@ -75,6 +76,8 @@ const soldOut =
         <figure class="figure">
           <img
             src={image.file?.url}
+            srcset={srcset(image.file?.url, PRODUCT_WIDTHS)}
+            sizes="(min-width: 900px) 58vw, 86vw"
             alt={index === 0 ? product.name : ''}
             loading={index === 0 ? 'eager' : 'lazy'}
           />
@@ -265,7 +268,7 @@ const soldOut =
         JavaScript: the control is barred from validation, so it cannot block
         the form, and left out of the post, so it cannot be charged for. */}
     {options.length > 0 && (
-      <script is:inline>
+      <script is:inline data-cfasync="false">
         (function () {
           var form = document.querySelector('[data-cart-form]');
           if (!form) return;

@@ -146,7 +146,10 @@ function styleFor(tokens: Record<string, unknown>): string | undefined {
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap"
       media="print"
     />
-    <script is:inline>
+    {/* data-cfasync keeps Cloudflare's Rocket Loader, which the proxy's zone
+        turns on, from holding this back until the page has loaded: the font
+        would stay off until then. */}
+    <script is:inline data-cfasync="false">
       (function () {
         var el = document.getElementById('webfont');
         if (!el) return;
@@ -463,7 +466,7 @@ function styleFor(tokens: Record<string, unknown>): string | undefined {
           const media = el('div', 'line__media');
           if (line.image) {
             const img = el('img');
-            img.src = line.image;
+            img.src = thumb(line.image);
             img.alt = '';
             media.append(img);
           }
@@ -512,7 +515,38 @@ function styleFor(tokens: Record<string, unknown>): string | undefined {
 
         // ---- data ---------------------------------------------------------
 
+        // The session lives in the swell-data cookie the server writes, which
+        // is readable here. Unreadable counts as present: then the server is
+        // asked, as before.
+        function hasSession(): boolean {
+          const raw = document.cookie
+            .split('; ')
+            .find((cookie) => cookie.startsWith('swell-data='));
+
+          if (!raw) return false;
+
+          try {
+            return Boolean(JSON.parse(decodeURIComponent(raw.slice('swell-data='.length)))['swell-session']);
+          } catch {
+            return true;
+          }
+        }
+
+        // Swell's CDN resizes on request; a drawer thumbnail needs a fraction of
+        // the picture. Other hosts serve one size and get the URL as it is.
+        function thumb(url: string): string {
+          if (!/^https:\/\/cdn\.swell\.store\//.test(url)) return url;
+          return `${url}${url.includes('?') ? '&' : '?'}width=240`;
+        }
+
         async function load(): Promise<Cart | null> {
+          // No session means no cart — a first visit, or a shopper who has not
+          // added anything — and asking would only say so a round trip later.
+          if (!hasSession()) {
+            render(emptyCart());
+            return null;
+          }
+
           try {
             const res = await fetch('/cart.json', { credentials: 'same-origin' });
             const data = await res.json();
@@ -2043,6 +2077,18 @@ function styleFor(tokens: Record<string, unknown>): string | undefined {
   .pdp__media {
     display: grid;
     gap: var(--gutter);
+  }
+
+  /* Here a picture keeps its own shape. The 4:5 frame that evens out the grid
+     centred a square mockup in a band of tint, which sat the product well
+     below the title beside it. The empty placeholder is a div, and keeps it. */
+  .pdp__media figure.figure {
+    aspect-ratio: auto;
+  }
+
+  .pdp__media figure.figure img {
+    position: static;
+    height: auto;
   }
 
   /* Below both columns, not beside them: the grid is two tracks wide and this

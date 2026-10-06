@@ -2,6 +2,7 @@
 import type { SwellData } from '@swell/apps-sdk';
 
 import { formatMoney } from '@/lib/format';
+import { CARD_SIZES, PRODUCT_WIDTHS, srcset } from '@/lib/image';
 
 interface Props {
   product: SwellData;
@@ -21,8 +22,27 @@ const onSale = Boolean(product.sale) && Number(product.orig_price) > 0;
 
 <a class="card" href={href}>
   <div class="card__media">
-    {image && <img src={image} alt={product.name} loading="lazy" />}
-    {hoverImage && <img src={hoverImage} alt="" aria-hidden="true" loading="lazy" />}
+    {image && (
+      <img
+        src={image}
+        srcset={srcset(image, PRODUCT_WIDTHS)}
+        sizes={CARD_SIZES}
+        alt={product.name}
+        loading="lazy"
+      />
+    )}
+    {/* Fetched on the first hover, not with the page: a whole grid of second
+        shots doubled what the page downloaded, and a touch screen never
+        shows them. Without the script there is no hover shot at all. */}
+    {hoverImage && (
+      <img
+        data-src={hoverImage}
+        data-srcset={srcset(hoverImage, PRODUCT_WIDTHS)}
+        sizes={CARD_SIZES}
+        alt=""
+        aria-hidden="true"
+      />
+    )}
   </div>
 
   <div class="card__body">
@@ -34,3 +54,26 @@ const onSale = Boolean(product.sale) && Number(product.orig_price) > 0;
     </p>
   </div>
 </a>
+
+<script>
+  function reveal(target: EventTarget | null) {
+    const img = (target as Element | null)
+      ?.closest?.('.card')
+      ?.querySelector<HTMLImageElement>('img[data-src]');
+
+    if (!img) return;
+
+    if (img.dataset.srcset) img.srcset = img.dataset.srcset;
+    img.src = img.dataset.src!;
+    img.removeAttribute('data-src');
+  }
+
+  // A mouse or a pen, not a finger: a tap on a card is a navigation, and the
+  // shot would arrive on a page that is already leaving.
+  document.addEventListener('pointerover', (event) => {
+    if (event.pointerType !== 'touch') reveal(event.target);
+  });
+
+  // The cross-fade also follows keyboard focus.
+  document.addEventListener('focusin', (event) => reveal(event.target));
+</script>

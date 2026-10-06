@@ -2,6 +2,7 @@
 import type { SwellData } from '@swell/apps-sdk';
 
 import T from '@/components/T.astro';
+import { CARD_SIZES, PRODUCT_WIDTHS, srcset } from '@/lib/image';
 import type { Section } from '@/lib/sections';
 
 /**
@@ -39,7 +40,9 @@ const categories: SwellData[] = list?.results ?? [];
           return (
             <a class="card sec__tile" href={`/categories/${category.slug || category.id}`}>
               <div class="sec__media sec__media--square">
-                {img && <img src={img} alt="" loading="lazy" />}
+                {img && (
+                  <img src={img} srcset={srcset(img, PRODUCT_WIDTHS)} sizes={CARD_SIZES} alt="" loading="lazy" />
+                )}
               </div>
               <div class="card__body">
                 <h3 class="card__name">{category.name}</h3>

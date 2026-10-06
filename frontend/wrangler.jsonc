@@ -13,22 +13,35 @@
     "directory": "./dist"
   },
   // The page cache is keyed by deploy: each version gets a fresh epoch, so a
-  // release never serves the previous build's HTML. The cache itself is the
-  // Workers Cache API — no KV namespace, so nothing to provision per store.
+  // release never serves the previous build's HTML.
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
   },
+  // Where the page cache lives: one KV store for every data center. The proxy
+  // reaches this worker through several, and the Workers Cache API keeps one
+  // cache per data center, so most requests missed. A deployment without this
+  // binding falls back to the Cache API.
+  "kv_namespaces": [
+    {
+      "binding": "NAMESPACE",
+      "id": "93f0baa44526426e88d3de3703185684"
+    }
+  ],
   "observability": {
     "logs": {
       "enabled": true
     }
   },
-  // Named environments for `wrangler deploy --env preview|production`. They are
-  // empty because everything above is inherited, and there is nothing
-  // per-environment to override. Set HTML_CACHE_TTL (seconds, 0 to disable) or
-  // HTML_CACHE=false in `vars` here to override the merchant's cache setting.
+  // Named environments for `wrangler deploy --env preview|production`. Bindings
+  // are not inherited, so each repeats the page cache's; everything else above
+  // is. Set HTML_CACHE_TTL (seconds, 0 to disable) or HTML_CACHE=false in `vars`
+  // here to override the merchant's cache setting.
   "env": {
-    "preview": {},
-    "production": {}
+    "preview": {
+      "kv_namespaces": [{ "binding": "NAMESPACE", "id": "93f0baa44526426e88d3de3703185684" }]
+    },
+    "production": {
+      "kv_namespaces": [{ "binding": "NAMESPACE", "id": "93f0baa44526426e88d3de3703185684" }]
+    }
   }
 }

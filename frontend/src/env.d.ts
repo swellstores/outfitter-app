@@ -15,6 +15,8 @@ interface ENV {
   HTML_CACHE_TTL?: string;
   /** Manual cache epoch, for deployments without version metadata. */
   HTML_CACHE_EPOCH?: string;
+  /** The page cache's KV store, shared by every data center. Absent, the Cache API is used. */
+  NAMESPACE?: import('@cloudflare/workers-types').KVNamespace;
 }
 
 type Runtime = import('@astrojs/cloudflare').Runtime<ENV>;
