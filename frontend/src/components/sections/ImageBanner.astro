@@ -19,7 +19,9 @@ const { editMode } = Astro.locals;
 
 <section class="sec sec--image-banner" data-section={section.id} data-section-type="image_banner">
   <div class="sec__media sec__media--wide">
-    {section.image && <img src={section.image} alt="" loading="lazy" />}
+    {/* Not lazy: a banner is usually the first picture on the page, and a
+        lazy one is only fetched after layout, so it would arrive last. */}
+    {section.image && <img src={section.image} alt="" />}
 
     <div class="sec__overlay">
       {(section.eyebrow || editMode) && (
