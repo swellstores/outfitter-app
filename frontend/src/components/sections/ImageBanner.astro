@@ -25,7 +25,9 @@ const { editMode } = Astro.locals;
       {(section.eyebrow || editMode) && (
         <p class="eyebrow"><T id={`sec:${section.id}:eyebrow`} value={section.eyebrow} /></p>
       )}
-      <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+      {(section.heading || editMode) && (
+        <h2 class="title"><T id={`sec:${section.id}:heading`} value={section.heading} /></h2>
+      )}
       {(section.body || editMode) && (
         <p class="lede"><T id={`sec:${section.id}:body`} value={section.body} /></p>
       )}

@@ -1726,7 +1726,17 @@ export function sectionStyle(section: Section): string {
     out.push('--sec-scrim:100');
   }
 
-  if (at('button_style') === 'outline') {
+  // An inverted band is the primary colour, which is also the button's fill
+  // and line, so there the button takes the band's own foreground instead.
+  const outline = at('button_style') === 'outline';
+
+  if (background === 'inverted') {
+    out.push(
+      `--sec-btn-bg:${outline ? 'transparent' : 'var(--color-secondary)'}`,
+      `--sec-btn-fg:${outline ? 'var(--color-secondary)' : 'var(--color-primary)'}`,
+      '--sec-btn-line:var(--color-secondary)',
+    );
+  } else if (outline) {
     out.push('--sec-btn-bg:transparent', '--sec-btn-fg:var(--color-primary)');
   }
 

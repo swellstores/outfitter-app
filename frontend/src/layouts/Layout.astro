@@ -1866,11 +1866,25 @@ function styleFor(tokens: Record<string, unknown>): string | undefined {
     color: var(--color-secondary);
   }
 
-  /* A home section may ask for an outline button; the storefront's own
-     primary buttons, and every hover state, are untouched. */
+  /* A home section may ask for an outline button, and an inverted band
+     swaps the button to its own foreground; the storefront's own primary
+     buttons are untouched. */
   [data-section] .btn--primary {
+    border-color: var(--sec-btn-line, var(--color-primary));
     background: var(--sec-btn-bg, var(--color-primary));
     color: var(--sec-btn-fg, var(--color-secondary));
+  }
+
+  /* Hover inverts against the band the button sits on, which is the page
+     everywhere but an inverted band. */
+  [data-section] .btn--primary:hover {
+    background: var(--sec-bg, var(--color-background));
+    color: var(--sec-fg, var(--color-primary));
+  }
+
+  /* The focus ring is the primary colour too, so it follows the band. */
+  [data-section] :focus-visible {
+    outline-color: var(--sec-fg, var(--color-primary));
   }
 
   /* Hover inverts rather than tints, so it holds for any palette. */
