@@ -37,6 +37,16 @@ const storeName: string =
   storeNameOverride || settings?.state?.store?.name || 'Outfitter';
 const logo = typeof app.logo === 'string' ? app.logo : app.logo?.url;
 
+// The merchant's own tab icon, or Outfitter's. An upload sits on Swell's CDN,
+// which resizes on request: a tab icon needs 96px at most, whatever was sent.
+const faviconUpload: string | undefined =
+  typeof app.favicon === 'string' ? app.favicon : app.favicon?.url;
+const favicon = faviconUpload
+  ? /^https:\/\/cdn\.swell\.store\//.test(faviconUpload)
+    ? `${faviconUpload}${faviconUpload.includes('?') ? '&' : '?'}width=96`
+    : faviconUpload
+  : undefined;
+
 // The language and currency control, only when there is a choice to make.
 // It posts to /localization and comes back here: the query string comes too,
 // so an editing render (`__edit`) stays one after the switch.
@@ -148,8 +158,14 @@ const speculationRules = {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark light" />
-    {/* Inline: a request for /favicon.svg would cross the proxy like any page. */}
-    <link rel="icon" type="image/svg+xml" href={FAVICON} />
+    {/* Outfitter's own is inline: a request for /favicon.svg would cross the
+        proxy like any page. An upload comes from the CDN, in whatever format
+        it was sent, so it carries no type. */}
+    {favicon ? (
+      <link rel="icon" href={favicon} />
+    ) : (
+      <link rel="icon" type="image/svg+xml" href={FAVICON} />
+    )}
     <title>{pageTitle}</title>
     {description && <meta name="description" content={description} />}
     {/* What a link pasted into chat or social shows. */}

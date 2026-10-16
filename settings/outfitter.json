@@ -17,6 +17,13 @@
       "description": "Replaces the store name in the header. A transparent PNG works best — the header sits over the page with no background of its own."
     },
     {
+      "id": "favicon",
+      "label": "Favicon",
+      "type": "image",
+      "admin_span": 2,
+      "description": "The icon in the browser tab. A square PNG or SVG, at least 96 pixels across. Leave it empty for Outfitter's own icon."
+    },
+    {
       "type": "field_row",
       "fields": [
         {
