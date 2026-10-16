@@ -111,6 +111,30 @@ function styleFor(tokens: Record<string, unknown>): string | undefined {
 
   return declarations.length > 0 ? declarations.join(';') : undefined;
 }
+
+// Chromium prerenders a page link once the pointer rests on it — on a phone,
+// once it settles in view — so the page is ready when it is clicked. Every page
+// costs most of a second to reach through the proxy, cached or not; this
+// spends it before the click. Pages that are per-visitor are left out: they are
+// not cached, and the cart link opens the drawer instead.
+const speculationRules = {
+  prerender: [
+    {
+      where: {
+        and: [
+          { href_matches: '/*' },
+          {
+            not: {
+              href_matches: ['/cart', '/cart/*', '/checkout', '/checkout/*', '/account', '/account/*', '/editor', '/editor/*'],
+            },
+          },
+          { not: { selector_matches: '[data-cart-open], [rel~="nofollow"]' } },
+        ],
+      },
+      eagerness: 'moderate',
+    },
+  ],
+};
 ---
 
 <html
@@ -338,6 +362,17 @@ function styleFor(tokens: Record<string, unknown>): string | undefined {
          opening on a first click on an add-to-cart label while editing. */
       editMode && <EditClient />
     }
+
+    {/* Not while editing: the editor's preview should only show the page it
+        was asked for. */}
+    {!editMode && (
+      <script
+        is:inline
+        type="speculationrules"
+        data-cfasync="false"
+        set:html={JSON.stringify(speculationRules)}
+      />
+    )}
 
     <script>
       // The language and currency control applies on change. The Apply

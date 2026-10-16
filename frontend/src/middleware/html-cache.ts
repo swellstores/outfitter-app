@@ -44,11 +44,15 @@ import {
  */
 
 export const DEFAULT_TTL_SECONDS = 60;
-const SWR_SECONDS = 60 * 60 * 24; // a day — beyond this a stale page is re-rendered inline
-// The longest a page is ever fresh for, whatever the setting says: the SDK
-// keeps an entry until `ttl + swr` has passed, so an absurd value would pin a
-// page — a forged one included — until the next deploy.
-const MAX_TTL_SECONDS = SWR_SECONDS;
+// How long a page past its TTL is still served, at once, while a fresh one
+// renders behind it — beyond this it is re-rendered inline. A month, because
+// on a quiet store most visits arrive after the last render's TTL, and each
+// would otherwise wait out a render of its own.
+const SWR_SECONDS = 60 * 60 * 24 * 30;
+// The longest a page is ever fresh for, whatever the setting says: a fresh
+// page is never re-rendered, so an absurd value would pin one — a forged one
+// included — until the next deploy.
+const MAX_TTL_SECONDS = 60 * 60 * 24;
 
 // The SDK's key falls back to USD and en-US when the shopper has chosen
 // neither, but the render falls back to the store's defaults, which need not
