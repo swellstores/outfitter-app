@@ -2,6 +2,7 @@
 	"id": "outfitter",
 	"name": "Outfitter",
 	"description": "Install it and you have a merch store. No theme, no build.",
+	"repository_url": "https://github.com/swellstores/outfitter-app",
 	"type": "storefront",
 	"version": "1.0.11",
 	"use_cases": [

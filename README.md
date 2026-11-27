@@ -152,3 +152,7 @@ from that file.
 
 **A new setting** — add it to `settings/outfitter.json` and read it off
 `getAppSettings()`.
+
+## License
+
+MIT. See [LICENSE](LICENSE). Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).

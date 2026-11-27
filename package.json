@@ -5,7 +5,7 @@
     "typescript": "^5.9.3"
   },
   "name": "outfitter",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "typecheck": "npm run typecheck --workspace frontend"
