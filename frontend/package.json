@@ -12,7 +12,7 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^12.6.9",
+    "@astrojs/cloudflare": "^14.4.9",
     "@swell/apps-sdk": "^1.0.132",
     "astro": "^5.13.10",
     "jose": "^6.2.12"
